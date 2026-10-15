@@ -93,7 +93,7 @@ object XposedRuntimeInstaller {
                         "os.api_level" to Build.VERSION.SDK_INT.toString(),
                         // Lets the cloud side split play from sideload installs,
                         // which share version and commit.
-                        "distribution.channel" to BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
+                        "distribution.channel" to BuildConfig.FLAVOR,
                     ),
                 suppressedResultValues = setOf("skip"),
             ),

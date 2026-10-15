@@ -628,10 +628,6 @@ class SmsHandlerHook : BaseHook() {
         if (!runCatching { HookRuntimeBridge.prefsAccess.isEnabled(pluginContext) }.getOrDefault(false)) {
             return
         }
-        if (!runCatching { HookRuntimeBridge.prefsAccess.mobileAutomationAllowed(pluginContext) }.getOrDefault(false)) {
-            XLog.i(message = "Mobile entitlement gate skipped dispatch-chain side effects")
-            return
-        }
         val eventId = VerificationSmsIntentHookSupport.ensureEventId(intent)
         if (ModuleConflictArbiter.shouldSuppressByRelay(phoneContext, "SmsHandlerHook#$methodName")) {
             logSuppressedOnce("dispatchChain:$methodName")

@@ -491,24 +491,6 @@
     <string name="settings_group_notification">Notification</string>
     <string name="settings_group_experimental">Experimental</string>
     <string name="settings_group_others">Others</string>
-    <string name="mobile_entitlement_settings_title">Device activation status</string>
-    <string name="mobile_entitlement_settings_summary">Check status or activate this device</string>
-    <string name="mobile_entitlement_expires">Expires: %1$s</string>
-    <string name="mobile_entitlement_last_confirmed_at">Last confirmed: %1$s</string>
-    <string name="mobile_entitlement_copy_link">Copy activation link</string>
-    <string name="mobile_entitlement_link_copied">Activation link copied</string>
-    <string name="mobile_entitlement_renew_due">Activation status can be updated.</string>
-    <string name="mobile_entitlement_activate_qq">QQ activation</string>
-    <string name="mobile_entitlement_activate_google">Activate with Google</string>
-    <string name="mobile_entitlement_telegram_required">Google activation also requires Telegram channel membership.</string>
-    <string name="mobile_entitlement_open_telegram">Open Telegram</string>
-    <string name="mobile_entitlement_pending">Waiting for channel approval...</string>
-    <string name="mobile_entitlement_play_flow">Play activation uses Google and is not configured in this build.</string>
-    <string name="mobile_entitlement_not_loaded">Not loaded</string>
-    <string name="mobile_entitlement_poll_failed">Activation check failed; retrying...</string>
-    <string name="mobile_entitlement_challenge_expired">The activation request expired.</string>
-    <string name="mobile_entitlement_activation_token_used">The activation token has been consumed and is not saved or reusable.</string>
-    <string name="mobile_entitlement_or">Or</string>
 
     <!-- backup and restore -->
     <string name="pref_backup_title">Backup</string>
@@ -545,7 +527,6 @@
     <string name="model">Model</string>
     <string name="status_working">Working normally</string>
     <string name="status_not_active">Inactive</string>
-    <string name="mobile_entitlement_status_not_activated">Not activated</string>
     <string name="status_tip">Please enable in manager and reboot device</string>
     <string name="framework_incompatibility_title">Framework incompatibility detected</string>
     <string name="framework_incompatibility_hooker_annotation_message">Current framework is incompatible and hook registration failed. Please install a compatible newer build, or get the appropriate build from the community group.</string>
@@ -562,9 +543,6 @@
     <!-- overview end -->
     <string name="status_module_activated">Module status: Activated</string>
     <string name="status_module_not_activated">Module status: Not Activated</string>
-    <string name="status_entitlement_verified">Entitlement: Verified</string>
-    <string name="status_entitlement_unverified">Entitlement: Unverified</string>
-    <string name="status_entitlement_checking">Checking module activation and entitlement...</string>
     <string name="status_activate_hint">Please enable module and scope in LSPosed</string>
     <string name="module_status_active">Activated</string>
     <string name="module_status_inactive">Not Activated</string>

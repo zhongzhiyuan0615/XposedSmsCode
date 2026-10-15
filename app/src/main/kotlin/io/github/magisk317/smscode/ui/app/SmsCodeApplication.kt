@@ -1,18 +1,15 @@
 package io.github.magisk317.smscode.ui.app
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
-import android.os.Bundle
 import android.os.Build
 import io.github.magisk317.smscode.runtime.BuildConfig as RuntimeBuildConfig
 import com.github.tianma8023.xposed.smscode.BuildConfig
 import io.github.magisk317.smscode.common.constant.PrefConst
 import io.github.magisk317.smscode.runtime.common.diagnostics.ActivationDiagnosticsStore
 import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
-import io.github.magisk317.uikit.entitlement.MobileGate
 import io.github.magisk317.smscode.common.utils.XscPreferenceHooks
 import io.github.magisk317.smscode.common.utils.HookPreferenceMirror
 import io.github.magisk317.smscode.xposed.utils.ModuleActivationStore
@@ -32,12 +29,6 @@ import io.github.magisk317.xposed.logging.DefaultLogSanitizer
 import io.github.magisk317.smscode.di.appModule
 import io.github.magisk317.smscode.di.billingModule
 import io.github.magisk317.smscode.di.uiModule
-import com.magisk317.mobile.entitlement.MobileEntitlementBridge
-import io.github.magisk317.smscode.security.CiUpdateGateVault
-import com.magisk317.mobile.entitlement.MobileEntitlementConfig
-import com.magisk317.mobile.entitlement.MobileEntitlementCoordinator
-import com.magisk317.mobile.entitlement.MobileEntitlementPublishedState
-import com.magisk317.mobile.entitlement.MobileEntitlementRuntime
 import io.github.magisk317.smscode.runtime.RuntimeCodeRecordRestoreFacade
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -56,32 +47,10 @@ import io.github.magisk317.xposed.logging.AnonymousInstallationId
 class SmsCodeApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var startedActivityCount: Int = 0
-    private var entitlementForegroundPrimed = false
 
     override fun onCreate() {
         super.onCreate()
         AppPreferencesDataStore.install(XscPreferenceHooks)
-        if (BuildConfig.ENABLE_MOBILE_ENTITLEMENT) {
-            configureMobileEntitlement()
-        } else {
-            // Play distribution ships without the activation gate; publish an
-            // always-allowed snapshot so the automation gates (app and hook
-            // mirror) see the open state, including installs that cached an
-            // unactivated decision.
-            // KMP main (6360b89): MobileGate lives in commonMain now, so the
-            // Context parameter and the Context-taking lambdas it used to
-            // thread through are gone - the closures capture the application
-            // context directly.
-            MobileGate.publishAlwaysAllowed(
-                persist = {
-                    AppPreferencesDataStore.batchEdit(applicationContext) {
-                        setBoolean(PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED, true)
-                    }
-                },
-                mirror = { HookPreferenceMirror.publish(applicationContext) },
-            )
-        }
         android.util.Log.w("smscode", "SmsCodeApplication.onCreate() START")
         val installationId = AnonymousInstallationId.getOrCreate(this, TELEMETRY_PREFS_NAME)
         runBlocking {
@@ -113,7 +82,7 @@ class SmsCodeApplication : Application() {
                         "os.api_level" to Build.VERSION.SDK_INT.toString(),
                         // Lets the cloud side split play from sideload installs,
                         // which share version and commit.
-                        "distribution.channel" to BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
+                        "distribution.channel" to BuildConfig.FLAVOR,
                     ),
                 projectId = "83955172",
                 projectName = "XposedSmsCode",
@@ -152,43 +121,6 @@ class SmsCodeApplication : Application() {
         initXposedServiceActivationMonitor()
         importPendingCodeRecords()
         syncPreferences()
-        registerLicenseActivityKiller()
-        if (BuildConfig.ENABLE_MOBILE_ENTITLEMENT) {
-            CiUpdateGateVault.restoreIfEligible(this)
-            MobileEntitlementCoordinator.initialize(this, applicationScope)
-        }
-    }
-
-
-    private fun configureMobileEntitlement() {
-        MobileEntitlementRuntime.configure(
-            MobileEntitlementConfig(
-                apiOrigin = BuildConfig.MOBILE_ENTITLEMENT_API_ORIGIN,
-                signingPublicJwk = BuildConfig.MOBILE_ENTITLEMENT_SIGNING_PUBLIC_JWK,
-                appId = "xposed-sms-code",
-                channel = BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
-                enforced = BuildConfig.MOBILE_ENTITLEMENT_ENFORCED,
-            ),
-            bridge = object : MobileEntitlementBridge {
-                override fun publish(context: Context, state: MobileEntitlementPublishedState): Boolean = runBlocking {
-                    AppPreferencesDataStore.batchEdit(context) {
-                        setBoolean(
-                            PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-                            state.automationAllowed,
-                        )
-                        setString(
-                            PrefConst.KEY_MOBILE_ENTITLEMENT_TOKEN,
-                            state.entitlementToken.orEmpty(),
-                        )
-                    }
-                    HookPreferenceMirror.publish(context)
-                }
-
-                override fun log(message: String, vararg args: Any?) {
-                    XLog.i(message, *args)
-                }
-            },
-        )
     }
 
     private companion object {
@@ -347,42 +279,6 @@ class SmsCodeApplication : Application() {
 
     private fun readVerboseLogMode(): Boolean = runBlocking(Dispatchers.IO) {
         AppPreferencesDataStore.getBoolean(this@SmsCodeApplication, PrefConst.KEY_VERBOSE_LOG_MODE, false)
-    }
-
-    private fun registerLicenseActivityKiller() {
-        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-            override fun onActivityStarted(activity: Activity) {
-                if (startedActivityCount == 0) {
-                    if (entitlementForegroundPrimed) {
-                        if (BuildConfig.ENABLE_MOBILE_ENTITLEMENT) {
-                            applicationScope.launch {
-                                runCatching { MobileEntitlementCoordinator.refresh(this@SmsCodeApplication) }
-                            }
-                        }
-                    } else {
-                        // initialize() covers the first process start.
-                        entitlementForegroundPrimed = true
-                    }
-                }
-                startedActivityCount += 1
-            }
-            override fun onActivityResumed(activity: Activity) {
-                if (activity.javaClass.name == "com.pairip.licensecheck.LicenseActivity") {
-                    runCatching {
-                        Timber.w("Detected com.pairip.licensecheck.LicenseActivity. Finishing it to prevent gray screen.")
-                        activity.finish()
-                    }
-                        .onFailure { Timber.e(it, "Failed to finish LicenseActivity") }
-                }
-            }
-            override fun onActivityPaused(activity: Activity) {}
-            override fun onActivityStopped(activity: Activity) {
-                startedActivityCount = (startedActivityCount - 1).coerceAtLeast(0)
-            }
-            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-            override fun onActivityDestroyed(activity: Activity) {}
-        })
     }
 
     private fun ensureIpcToken() {

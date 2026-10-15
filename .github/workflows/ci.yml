@@ -19,11 +19,11 @@ jobs:
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          if [[ -z "$GITLAB_TOKEN" ]]; then
-            echo "::error::GITLAB_TOKEN secret is not set; cannot clone gitlab.com submodules"
-            exit 1
+          if [[ -n "$GITLAB_TOKEN" ]]; then
+            git config --global http.https://gitlab.com/.extraheader "AUTHORIZATION: basic $(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 -w0)"
+          else
+            echo "::notice::GITLAB_TOKEN secret not set; cloning public gitlab.com submodules anonymously"
           fi
-          git config --global http.https://gitlab.com/.extraheader "AUTHORIZATION: basic $(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 -w0)"
       - uses: actions/checkout@v7
         with:
           submodules: recursive
@@ -114,11 +114,11 @@ jobs:
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          if [[ -z "$GITLAB_TOKEN" ]]; then
-            echo "::error::GITLAB_TOKEN secret is not set; cannot clone gitlab.com submodules"
-            exit 1
+          if [[ -n "$GITLAB_TOKEN" ]]; then
+            git config --global http.https://gitlab.com/.extraheader "AUTHORIZATION: basic $(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 -w0)"
+          else
+            echo "::notice::GITLAB_TOKEN secret not set; cloning public gitlab.com submodules anonymously"
           fi
-          git config --global http.https://gitlab.com/.extraheader "AUTHORIZATION: basic $(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 -w0)"
       - uses: actions/checkout@v7
         with:
           submodules: recursive

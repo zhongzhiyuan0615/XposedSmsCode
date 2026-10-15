@@ -485,24 +485,6 @@
     <string name="settings_group_notification">通知设置</string>
     <string name="settings_group_experimental">实验性功能</string>
     <string name="settings_group_others">其他</string>
-    <string name="mobile_entitlement_settings_title">设备激活状态</string>
-    <string name="mobile_entitlement_settings_summary">查看状态或激活此设备</string>
-    <string name="mobile_entitlement_expires">到期时间：%1$s</string>
-    <string name="mobile_entitlement_last_confirmed_at">最近确认时间：%1$s</string>
-    <string name="mobile_entitlement_copy_link">复制激活链接</string>
-    <string name="mobile_entitlement_link_copied">跳转链接复制成功</string>
-    <string name="mobile_entitlement_renew_due">可以更新激活状态。</string>
-    <string name="mobile_entitlement_activate_qq">QQ 激活</string>
-    <string name="mobile_entitlement_activate_google">通过 Google 激活</string>
-    <string name="mobile_entitlement_telegram_required">Google 激活还需要加入官方 Telegram 频道。</string>
-    <string name="mobile_entitlement_open_telegram">打开 Telegram</string>
-    <string name="mobile_entitlement_pending">等待频道确认...</string>
-    <string name="mobile_entitlement_play_flow">Play 版本使用 Google 激活，本版本尚未配置。</string>
-    <string name="mobile_entitlement_not_loaded">未加载</string>
-    <string name="mobile_entitlement_poll_failed">激活检查失败，正在重试...</string>
-    <string name="mobile_entitlement_challenge_expired">激活请求已过期。</string>
-    <string name="mobile_entitlement_activation_token_used">一次性激活令牌已消费，不会保存或重复使用。</string>
-    <string name="mobile_entitlement_or">或者</string>
 
     <!-- backup and restore -->
     <string name="pref_backup_title">备份</string>
@@ -539,7 +521,6 @@
     <string name="model">型号</string>
     <string name="status_working">工作正常</string>
     <string name="status_not_active">未激活</string>
-    <string name="mobile_entitlement_status_not_activated">未激活</string>
     <string name="status_tip">请在管理器中启用并重启设备</string>
     <string name="framework_incompatibility_title">检测到框架不兼容</string>
     <string name="framework_incompatibility_hooker_annotation_message">当前框架与模块不兼容，Hook 注册失败。请安装兼容的新版本，或到群组内获取对应构建。</string>
@@ -556,9 +537,6 @@
     <!-- overview end -->
     <string name="status_module_activated">模块激活：已激活</string>
     <string name="status_module_not_activated">模块激活：未激活</string>
-    <string name="status_entitlement_verified">服务鉴权：已通过</string>
-    <string name="status_entitlement_unverified">服务鉴权：未通过</string>
-    <string name="status_entitlement_checking">正在检查模块激活与服务鉴权...</string>
     <string name="status_activate_hint">请尝试在 LSPosed 中激活并勾选作用域</string>
     <string name="module_status_active">已激活</string>
     <string name="module_status_inactive">未激活</string>

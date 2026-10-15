@@ -1,7 +1,6 @@
 package io.github.magisk317.smscode.di
 
 import io.github.magisk317.smscode.core.BuildConfig
-import io.github.magisk317.smscode.security.CiUpdateGateVault
 import io.github.magisk317.smscode.ui.home.AppConfigViewModel
 import io.github.magisk317.smscode.ui.home.SettingsViewModel
 import io.github.magisk317.smscode.ui.record.CodeRecordViewModel
@@ -22,7 +21,10 @@ val uiModule = module {
 
     single {
         val context = androidContext()
-        val isCiOrDebug = BuildConfig.DEBUG || BuildConfig.VERSION_NAME.contains("-202") || BuildConfig.VERSION_NAME.contains("-test") || BuildConfig.VERSION_NAME.contains("-ci")
+        val isCiOrDebug = BuildConfig.DEBUG ||
+            BuildConfig.VERSION_NAME.contains("-202") ||
+            BuildConfig.VERSION_NAME.contains("-test") ||
+            BuildConfig.VERSION_NAME.contains("-ci")
 
         val sources = if (isCiOrDebug) {
             listOf(
@@ -52,10 +54,6 @@ val uiModule = module {
             checker = checker,
             downloader = downloader,
             fileProviderAuthority = "${context.packageName}.files",
-            onForceUpdateDetected = {
-                // 门禁逻辑：一旦检测到 CI 强制更新，封存激活并熔断功能，向 Hook 进程发送拒止通知
-                CiUpdateGateVault.sealAndRevoke(context)
-            },
         )
     }
 }

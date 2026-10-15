@@ -6,8 +6,6 @@ import android.content.SharedPreferences
 import io.github.magisk317.smscode.runtime.BuildConfig
 import io.github.magisk317.smscode.runtime.common.prefs.CodeNotificationOwner
 import io.github.magisk317.smscode.common.constant.PrefConst
-import com.magisk317.mobile.entitlement.MobileEntitlementGate
-import io.github.magisk317.xposed.entitlement.MobileHookGateCheck
 import io.github.magisk317.smscode.db.entity.SmsMsg
 import io.github.magisk317.smscode.runtime.bridge.HookPrefsAccess
 import io.github.magisk317.smscode.runtime.contract.prefs.PrefRead
@@ -220,15 +218,6 @@ object HookPrefsReader : HookPrefsAccess {
         val defaultValue = true
         return getBooleanViaProvider(PrefConst.KEY_ENABLE, defaultValue)
     }
-
-    override fun mobileAutomationAllowed(context: Context): Boolean =
-        MobileHookGateCheck.isAllowedWhenEnabled(
-            gateEnabled = BuildConfig.ENABLE_MOBILE_ENTITLEMENT,
-            state = MobileEntitlementGate.read(getRemotePrefs()),
-            signingPublicJwk = BuildConfig.MOBILE_ENTITLEMENT_SIGNING_PUBLIC_JWK,
-            issuer = BuildConfig.MOBILE_ENTITLEMENT_API_ORIGIN,
-            appId = "xposed-sms-code",
-        )
 
     override fun isVerboseLogMode(context: Context): Boolean {
         val defaultValue = false

@@ -11,8 +11,6 @@ import androidx.core.content.ContextCompat
 import io.github.magisk317.smscode.runtime.verification.AutoInputAccessibilityNodeHelper
 import io.github.magisk317.smscode.runtime.verification.AutoInputAccessibilityNodeHelper.Result as AutoInputResult
 import io.github.magisk317.smscode.runtime.verification.AutoInputAccessibilityRequestHandler
-import io.github.magisk317.smscode.common.constant.PrefConst
-import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
 import io.github.magisk317.smscode.xposed.hook.system.SystemInputInjectorHook
 import io.github.magisk317.xposed.logging.XLog
 import io.github.magisk317.xposed.logging.MagiskOtel
@@ -30,10 +28,6 @@ class AutoInputAccessibilityService : AccessibilityService() {
 
     private val autoInputReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (!isMobileAutomationAllowed()) {
-                XLog.i(message = "Mobile entitlement gate skipped accessibility auto-input")
-                return
-            }
             AutoInputAccessibilityRequestHandler.handle(
                 serviceContext = this@AutoInputAccessibilityService,
                 receiver = this,
@@ -185,27 +179,8 @@ class AutoInputAccessibilityService : AccessibilityService() {
         code: String,
         autoEnter: Boolean,
     ): AutoInputResult {
-        if (!isMobileAutomationAllowed()) {
-            XLog.i(message = "Mobile entitlement gate skipped accessibility execution")
-            return AutoInputResult(false, "none", "mobile_entitlement", packageName)
-        }
         return AutoInputAccessibilityNodeHelper.performAutoInput(rootInActiveWindow, code, autoEnter)
     }
-
-    private fun isMobileAutomationAllowed(): Boolean =
-        // KMP main (6360b89) moved MobileGate into commonMain: the Context
-        // parameter is gone from the API (android.content.Context has no
-        // common-source representation), so capture it in the closure.
-        io.github.magisk317.uikit.entitlement.MobileGate.isAutomationAllowed(
-            com.github.tianma8023.xposed.smscode.BuildConfig.ENABLE_MOBILE_ENTITLEMENT,
-        ) {
-            AppPreferencesDataStore.getBoolean(
-                applicationContext,
-                PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-                PrefConst.DEFAULT_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-            )
-        }
-
 
     private fun emitA11y(stage: String, result: String = "ok", statusOk: Boolean = true) {
         MagiskOtel.event(

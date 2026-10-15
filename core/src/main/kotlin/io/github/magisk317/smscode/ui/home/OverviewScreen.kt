@@ -4,8 +4,6 @@ package io.github.magisk317.smscode.ui.home
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,11 +38,8 @@ import io.github.magisk317.smscode.core.BuildConfig
 import io.github.magisk317.uikit.R as UiKitR
 import io.github.magisk317.smscode.runtime.contract.diagnostics.ActivationStatusState
 import io.github.magisk317.smscode.common.constant.Const
-import io.github.magisk317.smscode.common.constant.PrefConst
-import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
 import io.github.magisk317.smscode.runtime.contract.diagnostics.ActivationDiagnosticsSnapshot
 import io.github.magisk317.smscode.runtime.common.diagnostics.ActivationDiagnosticsStore
-import io.github.magisk317.uikit.entitlement.rememberEntitlementState
 import io.github.magisk317.smscode.common.utils.xscPackageActions
 import io.github.magisk317.smscode.runtime.common.utils.BrowserUtils
 import io.github.magisk317.uikit.common.showLatestSnackbar
@@ -72,17 +67,8 @@ import io.github.magisk317.uikit.surface.QRCodeDialog
 import io.github.magisk317.uikit.surface.startAlipayPlatformDonate
 import io.github.magisk317.uikit.surface.saveImageToGalleryAsync
 
-private suspend fun readEntitlementAutomationAllowed(context: Context): Boolean =
-    AppPreferencesDataStore.getBoolean(
-        context,
-        PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-        false,
-    )
-
 internal data class OverviewUiState(
     val activationStatus: ActivationStatusState,
-    val mobileAutomationAllowed: Boolean,
-    val showEntitlement: Boolean,
     val showStatusDiagnostics: Boolean,
     val statusDiagnostics: List<Pair<String, String>>,
     val frameworkType: String,
@@ -99,7 +85,6 @@ private data class FrameworkDiagnostics(
 )
 
 internal class OverviewActions(
-    val onActivateClick: () -> Unit,
     val onToggleDiagnostics: () -> Unit,
     val onRootHintClick: () -> Unit,
     val onJoinTelegram: () -> Unit,
@@ -131,22 +116,6 @@ fun OverviewScreen(
     val billingProvider: io.github.magisk317.smscode.billing.BillingProvider = org.koin.compose.koinInject()
     var showQRCodeDialog by remember { mutableStateOf<Pair<Int, String>?>(null) }
     var showStatusDiagnostics by remember { mutableStateOf(false) }
-    val mobileAutomationAllowed = rememberEntitlementState(
-        isActive = isActive,
-        dataStoreReader = ::readEntitlementAutomationAllowed,
-    )
-    // Play removes the activation activity together with the gate. Resolve the
-    // component once so shared UI does not advertise or launch a screen that
-    // is absent from that variant's merged manifest.
-    val entitlementUiAvailable = remember(context) {
-        context.packageManager.resolveActivity(
-            Intent().setClassName(
-                context,
-                "io.github.magisk317.smscode.entitlement.MobileEntitlementActivity",
-            ),
-            PackageManager.MATCH_DEFAULT_ONLY,
-        ) != null
-    }
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
     fun showMessage(message: String) {
@@ -240,8 +209,6 @@ fun OverviewScreen(
 
     val state = OverviewUiState(
         activationStatus = activationStatus,
-        mobileAutomationAllowed = mobileAutomationAllowed,
-        showEntitlement = entitlementUiAvailable,
         showStatusDiagnostics = showStatusDiagnostics,
         statusDiagnostics = buildStatusDiagnostics(
             context = context,
@@ -256,14 +223,6 @@ fun OverviewScreen(
     )
 
     val actions = OverviewActions(
-        onActivateClick = {
-            context.startActivity(
-                Intent().setClassName(
-                    context,
-                    "io.github.magisk317.smscode.entitlement.MobileEntitlementActivity",
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        },
         onToggleDiagnostics = {
             showStatusDiagnostics = !showStatusDiagnostics
             showMessage(
@@ -378,24 +337,14 @@ fun OverviewScreen(
 @Composable
 fun StatusCard(
     isEnabled: Boolean,
-    isEntitled: Boolean,
-    showEntitlement: Boolean = true,
     showDiagnostics: Boolean,
     diagnostics: List<Pair<String, String>>,
-    onActivateClick: (() -> Unit)? = null,
     onDiagnosticsToggle: (() -> Unit)? = null,
 ) {
     val moduleStatusText = if (isEnabled) {
         stringResource(id = R.string.status_module_activated)
     } else {
         stringResource(id = R.string.status_module_not_activated)
-    }
-    val entitlementStatusText = if (!showEntitlement) {
-        ""
-    } else if (isEntitled) {
-        stringResource(id = R.string.status_entitlement_verified)
-    } else {
-        stringResource(id = R.string.status_entitlement_unverified)
     }
     val activateHint = if (!isEnabled) {
         stringResource(id = R.string.status_activate_hint)
@@ -404,19 +353,17 @@ fun StatusCard(
     }
 
     // Miuix hero card adopts the KernelSU-style oversized corner check mark shared via ui-kit
-    // (MiPush OverviewMiuix lineage). The auth state (mobile automation entitlement) drives the
-    // pass branch: entitled shows the check mark, everything else shows the error mark; a single
-    // tap opens the entitlement page while entitlement is missing.
+    // (MiPush OverviewMiuix lineage). A single tap toggles the diagnostics list.
     if (currentUiKitStyle() == UiKitStyle.Miuix) {
         val resolvedOnClick = rememberStatusCardClickHandler(
-            isEntitled = if (showEntitlement) isEntitled else true,
-            onActivateClick = onActivateClick.takeIf { showEntitlement },
+            isEntitled = true,
+            onActivateClick = null,
             onDiagnosticsToggle = onDiagnosticsToggle,
         )
         MiuixStatusCheckCard(
-            passed = if (showEntitlement) isEntitled else isEnabled,
-            title = if (showEntitlement) entitlementStatusText else moduleStatusText,
-            badge = if (showEntitlement) moduleStatusText else "",
+            passed = isEnabled,
+            title = moduleStatusText,
+            badge = "",
             summary = activateHint,
             diagnostics = if (showDiagnostics) diagnostics else emptyList(),
             onClick = { resolvedOnClick?.invoke() },
@@ -425,13 +372,13 @@ fun StatusCard(
     }
 
     StatusHeroCard(
-        title = if (showEntitlement) "$moduleStatusText\n$entitlementStatusText" else moduleStatusText,
+        title = moduleStatusText,
         summary = activateHint,
-        icon = if (isEnabled && (isEntitled || !showEntitlement)) Icons.Default.CheckCircle else Icons.Default.Warning,
-        highlighted = if (showEntitlement) isEnabled && isEntitled else isEnabled,
+        icon = if (isEnabled) Icons.Default.CheckCircle else Icons.Default.Warning,
+        highlighted = isEnabled,
         diagnostics = if (showDiagnostics) diagnostics else emptyList(),
-        isEntitled = if (showEntitlement) isEntitled else true,
-        onActivateClick = onActivateClick.takeIf { showEntitlement },
+        isEntitled = true,
+        onActivateClick = null,
         onDiagnosticsToggle = onDiagnosticsToggle,
     )
 }

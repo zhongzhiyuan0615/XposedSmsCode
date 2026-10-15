@@ -14,14 +14,6 @@ import io.github.magisk317.xposed.logging.MagiskOtel
 class AutoCancelReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (!runCatching { HookRuntimeBridge.prefsAccess.mobileAutomationAllowed(context) }.getOrDefault(false)) {
-            MagiskOtel.event(
-                name = "notify.cancel",
-                attributes = mapOf("result" to "skip", "process" to "hook", "reason" to "mobile_entitlement"),
-                statusOk = true,
-            )
-            return
-        }
         MagiskOtel.event(
             name = "notify.cancel",
             attributes = mapOf(

@@ -3,7 +3,6 @@ plugins {
     id("smscode.android.common")
     id("magisk.app.signing")
     id("magisk.app.packaging")
-    id("magisk.mobile.gate")
     id(libs.plugins.kotlin.parcelize.get().pluginId)
     id("magisk.android.room")
     id("magisk.android.compose")
@@ -23,13 +22,6 @@ val allowConflictBypass = findProperty("allowConflictBypass")
     ?.toString()
     ?.toBooleanStrictOrNull()
     ?: false
-val mobileEntitlementEnforced = true
-val mobileEntitlementApiOrigin = findProperty("mobileEntitlementApiOrigin")?.toString()
-    ?: "https://activate.magisk317.qzz.io"
-val mobileEntitlementSigningPublicJwk = findProperty("mobileEntitlementSigningPublicJwk")?.toString()
-    ?: """{"kty":"EC","x":"4kPpwUt1wFRuF3EqGq6q57J3YmANf7wyiNH90FNkAbI","y":"U4-E1XK6LjWIXMFNEoSAoik7nD1S07BDb7qAipQd4Ts","crv":"P-256","alg":"ES256","use":"sig","kid":"mobile-entitlement-1"}"""
-fun buildConfigString(value: String): String =
-    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 val generatedSmsCodeRulesAssetsDir = layout.buildDirectory.dir("generated/smscodeRulesAssets")
 val syncSmsCodeRulesAssets = tasks.register<Sync>("syncSmsCodeRulesAssets") {
     val rulesRoot = rootProject.layout.projectDirectory.dir("smscode/rules")
@@ -60,14 +52,7 @@ android {
         buildConfigField("int", "MODULE_VERSION", "$versionCodeInt")
         buildConfigField("boolean", "ALLOW_CONFLICT_BYPASS", allowConflictBypass.toString())
         buildConfigField("String", "B_DOWNLOAD_URL", "\"$relayDownloadUrl\"")
-        buildConfigField("boolean", "MOBILE_ENTITLEMENT_ENFORCED", mobileEntitlementEnforced.toString())
-        buildConfigField("String", "MOBILE_ENTITLEMENT_API_ORIGIN", buildConfigString(mobileEntitlementApiOrigin))
-        buildConfigField("String", "MOBILE_ENTITLEMENT_SIGNING_PUBLIC_JWK", buildConfigString(mobileEntitlementSigningPublicJwk))
     }
-
-    // MOBILE_ENTITLEMENT_CHANNEL and ENABLE_MOBILE_ENTITLEMENT come from the
-    // magisk.mobile.gate plugin so the app and the library modules the hook
-    // process runs from cannot drift apart.
 
     buildFeatures {
         buildConfig = true
@@ -101,7 +86,6 @@ tasks.named("preBuild") {
 }
 
 dependencies {
-    implementation(libs.mobile.entitlement.android)
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     implementation(project(":core"))
     implementation(project(":magisk-ui-kit"))
