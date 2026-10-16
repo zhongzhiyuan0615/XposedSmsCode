@@ -71,6 +71,7 @@ class SmsCodeApplication : Application() {
         initXposedServiceActivationMonitor()
         importPendingCodeRecords()
         syncPreferences()
+
     }
 
 

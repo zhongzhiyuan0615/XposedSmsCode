@@ -188,12 +188,33 @@ android:build:
       :app:assembleGithubDebug
       -PbuildSplits
       -PminifyDebug
+    # Bind artifact versionCode to the pipeline iid so the in-app
+    # update check sees a monotonically increasing version axis.
+    MAGISK_GRADLE_ARGS: "--warning-mode all -PversionCode=$CI_PIPELINE_IID"
   artifacts:
     name: "XposedSmsCode-debug-$CI_COMMIT_REF_SLUG"
     when: always
     expire_in: 14 days
     paths:
       - app/build/outputs/apk/**/debug/*.apk
+      - ci-dist/app-ci.apk
+  # A job-level after_script replaces the one inherited from
+  # .magisk_android_base, so the otel export is restated here before staging.
+  after_script:
+    - |
+      set +e
+      if [ -x "${MAGISK_CI_TOOLKIT_DIR:-}/ci/otel_export.sh" ]; then
+        bash "$MAGISK_CI_TOOLKIT_DIR/ci/otel_export.sh" "ci.job"           "magisk.toolkit_ref=${MAGISK_CI_TOOLKIT_REF:-}"           "magisk.span_source=android_base_after_script"
+      else
+        echo "otel: helper missing, skip"
+      fi
+    # The universal APK name embeds the build timestamp, while
+    # GitLabCiArtifactUpdateSource can only fetch artifacts by exact path
+    # (no glob), so stage a stable copy for the in-app update check.
+    - |
+      set -euo pipefail
+      mkdir -p ci-dist
+      cp app/build/outputs/apk/github/debug/universal_*.apk ci-dist/app-ci.apk
 
 android:detekt:
   extends:
@@ -363,6 +384,17 @@ android:ci:play-beta:
   needs:
     - job: android:ci:play-beta-bundle
       artifacts: true
+  # .magisk_utility_base ships the image only, and this job runs
+  # release/publish_play.sh from the toolkit, so resolve the toolkit here with
+  # the same contract .magisk_linux_base uses. bash/curl/python3/jq/openssl are
+  # pre-baked into utility:3.24; only the toolkit checkout was missing.
+  variables:
+    MAGISK_CI_TOOLKIT_DIR: "$CI_PROJECT_DIR/.magisk-ci-toolkit"
+  before_script:
+    - |
+      set -euo pipefail
+      chmod +x scripts/resolve_ci_toolkit.sh
+      bash scripts/resolve_ci_toolkit.sh >/dev/null
   script:
     - |
       set -euo pipefail

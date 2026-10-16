@@ -37,6 +37,7 @@ jobs:
         uses: ./.magisk-ci-toolkit/.github/actions/setup-android-ci
         with:
           checkout: 'false'
+          java-version: '27'
 
       - name: Run Detekt
         continue-on-error: true

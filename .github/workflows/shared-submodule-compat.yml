@@ -32,5 +32,6 @@ jobs:
         uses: ./.magisk-ci-toolkit/.github/actions/setup-android-ci
         with:
           checkout: 'false'
+          java-version: '27'
       - name: Verify shared submodule compatibility
         run: bash scripts/checks/verify_shared_submodule_compat.sh

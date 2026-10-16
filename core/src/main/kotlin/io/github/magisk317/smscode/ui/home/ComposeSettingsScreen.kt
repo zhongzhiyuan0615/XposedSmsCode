@@ -110,6 +110,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.viewmodel.koinViewModel
 
+private val isCiOrDebugBuild: Boolean =
+    BuildConfig.DEBUG ||
+        BuildConfig.VERSION_NAME.contains("-202") ||
+        BuildConfig.VERSION_NAME.contains("-test") ||
+        BuildConfig.VERSION_NAME.contains("-ci")
+
 private data class SettingsPageRuntime(
     val isActive: Boolean = true,
     val keepDataActive: Boolean = isActive,
@@ -1037,6 +1043,7 @@ internal fun ComposeSettingsScreenBody(
                                     RuntimeLogDiagnosticsItem.CLEAR_LOG,
                                 ),
                             ),
+                            enabled = isCiOrDebugBuild,
                         )
 
                         val updateController = koinInject<AppUpdateController>()

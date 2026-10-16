@@ -34,6 +34,7 @@ jobs:
         uses: ./.magisk-ci-toolkit/.github/actions/setup-android-ci
         with:
           checkout: 'false'
+          java-version: '27'
 
       - name: Decode Keystore
         if: env.HAS_RELEASE_SIGNING == 'true'
