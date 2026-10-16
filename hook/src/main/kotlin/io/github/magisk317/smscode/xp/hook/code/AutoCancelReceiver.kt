@@ -6,7 +6,6 @@ import android.content.Intent
 import io.github.magisk317.smscode.runtime.bridge.HookRuntimeBridge
 import io.github.magisk317.smscode.runtime.verification.CodeNotificationActionHandler
 import io.github.magisk317.smscode.runtime.verification.CodeNotificationActionPayload
-import io.github.magisk317.xposed.logging.MagiskOtel
 
 /**
  * Fallback auto-cancel when the module process is not alive.
@@ -14,17 +13,6 @@ import io.github.magisk317.xposed.logging.MagiskOtel
 class AutoCancelReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        MagiskOtel.event(
-            name = "notify.cancel",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "hook",
-                "stage" to "receiver",
-                "reason" to "auto_cancel",
-            ),
-            statusOk = true,
-        )
         CodeNotificationActionHandler.handleAutoCancelReceiverIntent(context, intent)
     }
 

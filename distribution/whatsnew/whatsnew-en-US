@@ -1,3 +1,4 @@
-- Updated to 3.3.10 (134).
-- Development build; release notes will be updated before publishing.
-- https://gitlab.com/magisk3171/XposedSmsCode/-/releases
+- Fork build 3.3.11 (135).
+- Activation gate fully removed: every feature works without activation.
+- Telemetry and anonymous installation tracking removed; no data leaves your device.
+- https://github.com/zhongzhiyuan0615/XposedSmsCode

@@ -14,7 +14,6 @@ import io.github.magisk317.smscode.xposed.hook.system.SystemInputInjectorHook
 import io.github.magisk317.xposed.logging.XLog
 import io.github.magisk317.smscode.db.entity.SmsMsg
 import io.github.magisk317.smscode.xp.hook.code.action.CallableAction
-import io.github.magisk317.xposed.logging.MagiskOtel
 
 class KillMeAction(
     pluginContext: Context,
@@ -178,18 +177,6 @@ class KillMeAction(
             mWaitResolveSuccess,
             mWaitResolveReason,
         )
-        MagiskOtel.event(
-            name = "app.kill",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "hook",
-                "stage" to "hook_chain",
-                "reason" to mWaitResolveReason.ifBlank { "n/a" },
-                "source" to if (mWaitResolveSuccess) "auto_input_ok" else "auto_input_fail",
-            ),
-            statusOk = true,
-        )
         proceedWithKillChain()
     }
 
@@ -207,51 +194,18 @@ class KillMeAction(
 
     private fun killMe() {
         if (!HookRuntimeBridge.prefsAccess.killMeEnabled(mPluginContext)) {
-            MagiskOtel.event(
-                name = "app.kill",
-                attributes = mapOf(
-                    "result" to "skip",
-                    "duration_ms" to "0",
-                    "process" to "hook",
-                    "stage" to "primary",
-                    "reason" to "disabled",
-                ),
-                statusOk = true,
-            )
             return
         }
         if (requestSelfKillPrimary()) {
             return
         }
         XLog.w(message = "KillMeAction: provider self-kill failed for process %s", mPhoneContext.packageName)
-        MagiskOtel.event(
-            name = "app.kill",
-            attributes = mapOf(
-                "result" to "error",
-                "duration_ms" to "0",
-                "process" to "hook",
-                "stage" to "primary",
-                "reason" to "request_failed",
-            ),
-            statusOk = false,
-        )
     }
 
     private fun requestSelfKillPrimary(): Boolean {
         return try {
             val token = HookRuntimeBridge.prefsAccess.getIpcToken(mPluginContext)
             if (token.isBlank()) {
-                MagiskOtel.event(
-                    name = "app.kill",
-                    attributes = mapOf(
-                        "result" to "error",
-                        "duration_ms" to "0",
-                        "process" to "hook",
-                        "stage" to "primary",
-                        "reason" to "token_blank",
-                    ),
-                    statusOk = false,
-                )
                 return false
             }
             val intent = Intent(HookBroadcastContract.ACTION_KILL_SELF).apply {
@@ -262,32 +216,9 @@ class KillMeAction(
             }
             mPluginContext.sendBroadcast(intent)
             XLog.w(message = "KillMeAction primary requested via KillSelfControlReceiver")
-            MagiskOtel.event(
-                name = "app.kill",
-                attributes = mapOf(
-                    "result" to "ok",
-                    "duration_ms" to "0",
-                    "process" to "hook",
-                    "stage" to "primary",
-                    "reason" to "broadcast_sent",
-                ),
-                statusOk = true,
-            )
             true
         } catch (e: Throwable) {
             XLog.w(message = "KillMeAction primary failed: %s", e.message ?: e.javaClass.simpleName)
-            MagiskOtel.event(
-                name = "app.kill",
-                attributes = mapOf(
-                    "result" to "error",
-                    "duration_ms" to "0",
-                    "process" to "hook",
-                    "stage" to "primary",
-                    "reason" to "exception",
-                    "error_class" to e.javaClass.simpleName,
-                ),
-                statusOk = false,
-            )
             false
         }
     }

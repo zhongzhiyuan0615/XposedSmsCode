@@ -3,6 +3,18 @@
 本日志记录了项目重构后的主要变更。
 
 ---
+## [v3.3.11] - 2026-10-16
+- 版本：`versionCode 135` / `versionName 3.3.11`。
+- `[feat]` 移除激活门禁：自动填充、拦截短信、标记已读、删除短信、复制验证码、验证码记录等全部功能无需激活即可使用。
+- `[refactor]` 删除激活页（MobileEntitlementActivity）、激活令牌与设备凭据（CiUpdateGateVault）、激活入口 UI 与三语激活文案；总览状态卡仅显示 Xposed 模块启用状态。
+- `[feat]` 移除遥测与匿名统计：App 与 Hook 进程不再配置或上报任何 OTEL 数据，删除设置页“统计”开关、匿名安装 ID 与遥测偏好文件，运行时零数据外发。
+- `[build]` 移除 entitlement SDK、激活专用 BuildConfig 字段与 magisk.mobile.gate 插件。
+- `[ci]` GitHub Actions 的 GITLAB_TOKEN 改为可选（子模块仓库公开），发布流水线仅需签名密钥即可出包。
+- `[fix]` 修复两处已存在的 detekt 超长行，使质量门禁全绿。
+
+> Full Changelog: https://github.com/zhongzhiyuan0615/XposedSmsCode/compare/v3.3.10...v3.3.11
+
+---
 ## [v3.3.10] - Unreleased
 - 版本：`versionCode 134` / `versionName 3.3.10`。
 - 下一轮开发占位，发布前补充具体变更。

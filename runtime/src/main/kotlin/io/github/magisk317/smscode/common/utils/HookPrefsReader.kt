@@ -228,11 +228,6 @@ object HookPrefsReader : HookPrefsAccess {
         return getBooleanViaProvider(PrefConst.KEY_SENSITIVE_DEBUG_LOG_MODE, false)
     }
 
-    @JvmStatic
-    fun isAnalyticsEnabled(context: Context): Boolean {
-        return getBooleanViaProvider(PrefConst.KEY_ENABLE_ANALYTICS, true)
-    }
-
     override fun autoInputCodeEnabled(context: Context): Boolean {
         val defaultValue = true
         return getBooleanViaProvider(PrefConst.KEY_ENABLE_AUTO_INPUT_CODE, defaultValue)

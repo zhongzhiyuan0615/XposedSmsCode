@@ -40,8 +40,6 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import timber.log.Timber
-import io.github.magisk317.xposed.logging.MagiskOtel
-import io.github.magisk317.xposed.logging.AnonymousInstallationId
 
 @SuppressLint("LogNotTimber")
 class SmsCodeApplication : Application() {
@@ -52,54 +50,6 @@ class SmsCodeApplication : Application() {
         super.onCreate()
         AppPreferencesDataStore.install(XscPreferenceHooks)
         android.util.Log.w("smscode", "SmsCodeApplication.onCreate() START")
-        val installationId = AnonymousInstallationId.getOrCreate(this, TELEMETRY_PREFS_NAME)
-        runBlocking {
-            AppPreferencesDataStore.setString(
-                this@SmsCodeApplication,
-                AnonymousInstallationId.PREFERENCE_KEY,
-                installationId,
-            )
-        }
-        MagiskOtel.configureForInstallation(
-            this,
-            MagiskOtel.Config(
-                enabled = BuildConfig.DEBUG || runBlocking {
-                    AppPreferencesDataStore.getBoolean(
-                        this@SmsCodeApplication,
-                        PrefConst.KEY_ENABLE_ANALYTICS,
-                        true,
-                    )
-                },
-                serviceName = "xposedsmscode",
-                serviceVersion = BuildConfig.VERSION_NAME,
-                serviceCommit = BuildConfig.COMMIT_HASH,
-                deviceAttributes =
-                    mapOf(
-                        "device.manufacturer" to Build.MANUFACTURER,
-                        "device.model" to Build.MODEL,
-                        "os.name" to "android",
-                        "os.version" to Build.VERSION.RELEASE,
-                        "os.api_level" to Build.VERSION.SDK_INT.toString(),
-                        // Lets the cloud side split play from sideload installs,
-                        // which share version and commit.
-                        "distribution.channel" to BuildConfig.FLAVOR,
-                    ),
-                projectId = "83955172",
-                projectName = "XposedSmsCode",
-                environment = if (BuildConfig.DEBUG) "debug" else "release",
-                // Skip dominates this service (~81% of every span): an intercept check that found
-                // nothing to do. Dropping it keeps ok / error / fallback readable.
-                suppressedResultValues = setOf("skip"),
-            ),
-            TELEMETRY_PREFS_NAME,
-        )
-        MagiskOtel.event(
-            name = "app.boot",
-            attributes = mapOf(
-                "result" to "ok",
-                "process" to "main",
-            ),
-        )
         ensureIpcToken()
         RuntimeDiagnosticsBridge.ensureInstalled()
         RuntimeLogStore.initialize(this, enableDetailedLogs = false)
@@ -123,9 +73,7 @@ class SmsCodeApplication : Application() {
         syncPreferences()
     }
 
-    private companion object {
-        const val TELEMETRY_PREFS_NAME = "smscode_telemetry_prefs"
-    }
+
 
     private fun importPendingCodeRecords() {
         applicationScope.launch {
@@ -227,18 +175,6 @@ class SmsCodeApplication : Application() {
             frameworkName ?: "unknown",
             frameworkVersion ?: "unknown",
         )
-        MagiskOtel.event(
-            name = "app.lifecycle",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "xposed_service_bind",
-                "reason" to "connected",
-                "source" to (frameworkName ?: "unknown"),
-            ),
-            statusOk = true,
-        )
     }
 
     internal fun handleXposedServiceDied() {
@@ -249,32 +185,10 @@ class SmsCodeApplication : Application() {
             verboseLogging = readVerboseLogMode(),
         )
         XLog.w(message = "Xposed service disconnected")
-        MagiskOtel.event(
-            name = "app.lifecycle",
-            attributes = mapOf(
-                "result" to "error",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "xposed_service_died",
-                "reason" to "disconnected",
-            ),
-            statusOk = false,
-        )
     }
 
     internal fun logXposedServiceBridgeFailure(throwable: Throwable) {
         XLog.w(message = "Failed to register Xposed service listener: %s", throwable.message ?: "unknown")
-        MagiskOtel.event(
-            name = "app.lifecycle",
-            attributes = mapOf(
-                "result" to "error",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "xposed_service_bridge",
-                "reason" to throwable.javaClass.simpleName,
-            ),
-            statusOk = false,
-        )
     }
 
     private fun readVerboseLogMode(): Boolean = runBlocking(Dispatchers.IO) {

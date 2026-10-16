@@ -13,9 +13,6 @@
         domain="root"
         path="datastore/" />
     <exclude
-        domain="sharedpref"
-        path="smscode_telemetry_prefs.xml" />
-    <exclude
         domain="file"
         path="log/" />
     <exclude

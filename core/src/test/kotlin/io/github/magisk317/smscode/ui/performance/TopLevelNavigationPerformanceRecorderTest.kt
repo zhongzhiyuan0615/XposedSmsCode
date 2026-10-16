@@ -144,25 +144,6 @@ class TopLevelNavigationPerformanceRecorderTest {
         assertTrue(result.toLogLine().startsWith("ui.navigation token=nav-1"))
         assertFalse(result.toLogLine().contains('\n'))
         assertFalse(recorder.report().toLogLine().contains('\n'))
-        assertEquals(
-            setOf(
-                "token",
-                "source_page",
-                "target_page",
-                "input_kind",
-                "result",
-                "process",
-                "stage",
-                "cache_hit",
-                "missing_milestones",
-                "duration_ms",
-                "first_frame_ms",
-                "settled_ms",
-                "data_ready_ms",
-                "cache_hit_ms",
-            ),
-            result.toTelemetryAttributes().keys,
-        )
     }
 
     @Test

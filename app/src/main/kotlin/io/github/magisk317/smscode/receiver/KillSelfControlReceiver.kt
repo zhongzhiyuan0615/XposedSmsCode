@@ -8,23 +8,11 @@ import io.github.magisk317.smscode.common.constant.PrefConst
 import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
 import io.github.magisk317.xposed.logging.XLog
 import kotlinx.coroutines.runBlocking
-import io.github.magisk317.xposed.logging.MagiskOtel
 
 class KillSelfControlReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_KILL_SELF) {
             XLog.w(message = "KillSelfControlReceiver: ignored unexpected action=%s", intent.action.orEmpty())
-            MagiskOtel.event(
-                name = "app.kill",
-                attributes = mapOf(
-                    "result" to "skip",
-                    "duration_ms" to "0",
-                    "process" to "app",
-                    "stage" to "control",
-                    "reason" to "action_mismatch",
-                ),
-                statusOk = true,
-            )
             return
         }
 
@@ -34,17 +22,6 @@ class KillSelfControlReceiver : BroadcastReceiver() {
         val token = intent.getStringExtra(EXTRA_IPC_TOKEN).orEmpty()
         if (expectedToken.isBlank() || token.isBlank() || token != expectedToken) {
             XLog.w(message = "KillSelfControlReceiver: rejected kill request due to invalid token")
-            MagiskOtel.event(
-                name = "app.kill",
-                attributes = mapOf(
-                    "result" to "error",
-                    "duration_ms" to "0",
-                    "process" to "app",
-                    "stage" to "control",
-                    "reason" to "token_rejected",
-                ),
-                statusOk = false,
-            )
             return
         }
 
@@ -55,18 +32,6 @@ class KillSelfControlReceiver : BroadcastReceiver() {
             delayMs,
             Process.myPid(),
             processName,
-        )
-
-        MagiskOtel.event(
-            name = "app.kill",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "control",
-                "reason" to "scheduled",
-            ),
-            statusOk = true,
         )
         Thread {
             try {

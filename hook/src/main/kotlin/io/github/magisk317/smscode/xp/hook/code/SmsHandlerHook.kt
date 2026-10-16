@@ -33,7 +33,6 @@ import io.github.magisk317.xposed.HookEnv
 import io.github.magisk317.xposed.MethodHook
 import io.github.magisk317.xposed.LoadParam
 import io.github.magisk317.xposed.MethodHookParam
-import io.github.magisk317.xposed.logging.MagiskOtel
 import io.github.magisk317.smscode.runtime.contract.logging.LogRoute
 import io.github.magisk317.smscode.runtime.verification.SmsDispatchIntentDeduplicator
 import java.lang.reflect.Method
@@ -110,11 +109,6 @@ class SmsHandlerHook : BaseHook() {
                     android.os.Process.myPid(),
                     sharedHookAge,
                 )
-                emitHandler(
-                    result = "skip",
-                    reason = "shared_init_window",
-                    stage = "hook_install",
-                )
                 return
             }
             val hookKey = buildHookInstallKey(param)
@@ -125,31 +119,14 @@ class SmsHandlerHook : BaseHook() {
                     param.processName,
                     Integer.toHexString(System.identityHashCode(classLoader)),
                 )
-                emitHandler(
-                    result = "skip",
-                    reason = "already_initialized",
-                    stage = "hook_install",
-                )
                 return
             }
             XLog.i(message = "SmsCode initializing in %s", param.packageName)
             printDeviceInfo()
             try {
                 hookSmsHandler(classLoader)
-                emitHandler(
-                    result = "ok",
-                    reason = "installed",
-                    stage = "hook_install",
-                )
             } catch (e: Throwable) {
                 XLog.e(message = "Failed to hook SmsHandler", e)
-                emitHandler(
-                    result = "error",
-                    reason = "install_failed",
-                    stage = "hook_install",
-                    statusOk = false,
-                    errorClass = e.javaClass.simpleName,
-                )
             }
             XLog.i(message = "SmsCode initialize completely")
         }
@@ -383,23 +360,10 @@ class SmsHandlerHook : BaseHook() {
                 pluginContext,
                 phoneContext,
             )
-            emitHandler(
-                result = if (parked) "skip" else "error",
-                reason = if (parked) "context_null_parked" else "context_null_parked_full",
-                stage = "sms_handler",
-                eventIdPresent = true,
-                statusOk = false,
-            )
             return
         }
         replayPendingSms(pluginContext, phoneContext)
         if (shouldSkipDispatchBySharedDedup(pluginContext, eventId, action)) {
-            emitHandler(
-                result = "skip",
-                reason = "shared_store_dedupe",
-                stage = "dedupe_shared",
-                eventIdPresent = true,
-            )
             return
         }
         if (VerificationSmsIntentHookSupport.markDispatchHandled(intent, action, DISPATCH_HANDLER_KEY)) {
@@ -407,12 +371,6 @@ class SmsHandlerHook : BaseHook() {
                 message = "Diag SMS dispatch duplicate skip: event_id=%s action=%s source=intent_extra",
                 eventId,
                 action,
-            )
-            emitHandler(
-                result = "skip",
-                reason = "intent_extra_dedupe",
-                stage = "dedupe_intent",
-                eventIdPresent = true,
             )
             return
         }
@@ -450,16 +408,6 @@ class SmsHandlerHook : BaseHook() {
         if (outcome.inboundBlocked) {
             param.result = null
         }
-        emitHandler(
-            result = "ok",
-            reason = when {
-                outcome.inboundBlocked -> "inbound_blocked"
-                outcome.shouldStopDispatch -> "stop_dispatch"
-                else -> "handled"
-            },
-            stage = "sms_handler",
-            eventIdPresent = true,
-        )
         if (outcome.shouldStopDispatch) {
             return
         }
@@ -483,22 +431,11 @@ class SmsHandlerHook : BaseHook() {
         XLog.i(message = "Replaying %d parked sms dispatch(es)", ready.size)
         ready.forEach { entry ->
             runCatching {
-                val outcome = dispatchIntentHandler.handle(
+                dispatchIntentHandler.handle(
                     intent = entry.intent,
                     eventId = entry.eventId,
                     inboundSmsHandler = entry.inboundSmsHandler,
                     receiver = entry.receiver,
-                )
-                emitHandler(
-                    result = "ok",
-                    reason = if (outcome.inboundBlocked) {
-                        "replay_side_effects_only_block_too_late"
-                    } else {
-                        "replay_handled"
-                    },
-                    stage = "sms_handler_replay",
-                    eventIdPresent = true,
-                    statusOk = !outcome.inboundBlocked,
                 )
             }.onFailure {
                 XLog.e(message = "Pending sms replay failed: event_id=%s %s", entry.eventId, it.message ?: "unknown")
@@ -702,33 +639,6 @@ class SmsHandlerHook : BaseHook() {
             return true
         }
         return false
-    }
-
-
-    private fun emitHandler(
-        result: String,
-        reason: String,
-        stage: String,
-        eventIdPresent: Boolean = false,
-        statusOk: Boolean = true,
-        errorClass: String? = null,
-    ) {
-        val attrs = mutableMapOf(
-            "result" to result,
-            "duration_ms" to "0",
-            "process" to "hook",
-            "stage" to stage,
-            "reason" to reason,
-            "source" to "sms_handler",
-            "msg_type" to "sms",
-        )
-        if (eventIdPresent) {
-            attrs["event_id_present"] = "true"
-        }
-        if (!errorClass.isNullOrBlank()) {
-            attrs["error_class"] = errorClass
-        }
-        MagiskOtel.event(name = "sms.process", attributes = attrs, statusOk = statusOk)
     }
 
     private fun logSuppressedOnce(stage: String) {

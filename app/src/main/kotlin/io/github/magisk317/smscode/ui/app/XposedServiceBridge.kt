@@ -8,7 +8,6 @@ import io.github.libxposed.service.XposedServiceHelper
 import io.github.magisk317.xposed.logging.XLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import io.github.magisk317.xposed.logging.MagiskOtel
 
 internal object XposedServiceBridge {
     fun initialize(application: SmsCodeApplication, applicationScope: CoroutineScope) {
@@ -17,16 +16,6 @@ internal object XposedServiceBridge {
             XposedServiceHelper.registerListener(
                 object : XposedServiceHelper.OnServiceListener {
                     override fun onServiceBind(service: XposedService) {
-                        MagiskOtel.event(
-                            name = "hook.service",
-                            attributes = mapOf(
-                                "result" to "ok",
-                                "duration_ms" to "0",
-                                "process" to "app",
-                                "stage" to "bound",
-                            ),
-                            statusOk = true,
-                        )
                         XLog.i(
                             message = "XposedServiceBridge.onServiceBind() called: framework=%s version=%s",
                             service.frameworkName,
@@ -47,16 +36,6 @@ internal object XposedServiceBridge {
                     }
 
                     override fun onServiceDied(service: XposedService) {
-                        MagiskOtel.event(
-                            name = "hook.service",
-                            attributes = mapOf(
-                                "result" to "ok",
-                                "duration_ms" to "0",
-                                "process" to "app",
-                                "stage" to "died",
-                            ),
-                            statusOk = true,
-                        )
                         XLog.w(message = "XposedServiceBridge.onServiceDied() called")
                         application.handleXposedServiceDied()
                     }

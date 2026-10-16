@@ -73,7 +73,6 @@ import io.github.magisk317.uikit.surface.tabExitTransition
 import io.github.magisk317.uikit.surface.tabPredictivePopEnterTransition
 import io.github.magisk317.uikit.surface.tabPredictivePopExitTransition
 import io.github.magisk317.uikit.surface.tabTransitionDirection
-import io.github.magisk317.xposed.logging.MagiskOtel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
@@ -81,7 +80,6 @@ import timber.log.Timber
 
 private const val MAIN_PAGE_COUNT = 4
 private const val RECORDS_PAGE_INDEX = 2
-private const val NAVIGATION_EVENT_NAME = "ui.navigation"
 private const val NAVIGATION_LOG_TAG = "NavigationPerf"
 private const val NAVIGATION_REPORT_INTERVAL = 8
 private const val MAX_EMITTED_PERFORMANCE_TOKENS = 256
@@ -214,14 +212,8 @@ fun MainScreen(
             }
         }
         if (!emittedPerformanceTokens.add(token.id)) return
-        // Dispatch telemetry off the main thread to avoid adding to per-frame cost.
         performanceReportScope.launch(Dispatchers.Default) {
             Timber.tag(NAVIGATION_LOG_TAG).i(result.toLogLine())
-            MagiskOtel.event(
-                name = NAVIGATION_EVENT_NAME,
-                attributes = result.toTelemetryAttributes(),
-                statusOk = result.status == NavigationTransitionStatus.COMPLETED,
-            )
         }
         emittedPerformanceCount[0]++
         if (emittedPerformanceCount[0] % NAVIGATION_REPORT_INTERVAL == 0) {

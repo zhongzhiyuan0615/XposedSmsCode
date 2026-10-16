@@ -3,7 +3,6 @@ package io.github.magisk317.smscode.xp
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import io.github.magisk317.smscode.common.utils.HookPrefsReader
 import io.github.magisk317.smscode.common.utils.RuntimeDiagnosticsBridge
 import io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeLogStore
@@ -19,8 +18,6 @@ import io.github.magisk317.smscode.runtime.bridge.HookRuntimeBridge
 import io.github.magisk317.smscode.xp.helper.ModuleConflictArbiter
 import io.github.magisk317.smscode.hook.BuildConfig
 import io.github.magisk317.xposed.logging.DefaultLogSanitizer
-import io.github.magisk317.xposed.logging.MagiskOtel
-import io.github.magisk317.xposed.logging.AnonymousInstallationId
 import io.github.magisk317.smscode.xposed.runtime.CoreHookPolicy
 import io.github.magisk317.smscode.xposed.runtime.CoreHookPolicyHolder
 import io.github.magisk317.smscode.xposed.runtime.CoreLogSink
@@ -60,43 +57,6 @@ object XposedRuntimeInstaller {
         XposedLogClient.configure(
             authority = RuntimeLogProvider.authority(BuildConfig.APPLICATION_ID),
             source = "smscode",
-        )
-        val hookApp = runCatching {
-            Class.forName("android.app.ActivityThread")
-                .getMethod("currentApplication")
-                .invoke(null) as? android.content.Context
-        }.getOrNull()
-        val otelEnabled = if (hookApp != null) {
-            BuildConfig.DEBUG || HookPrefsReader.isAnalyticsEnabled(hookApp)
-        } else {
-            true
-        }
-        MagiskOtel.configureIfAbsent(
-            MagiskOtel.Config(
-                enabled = otelEnabled,
-                serviceName = "xposedsmscode",
-                serviceVersion = BuildConfig.VERSION_NAME,
-                projectId = "83955172",
-                projectName = "XposedSmsCode",
-                environment = if (BuildConfig.DEBUG) "debug" else "release",
-                serviceInstanceId = HookPrefsReader.getStringPreference(
-                    AnonymousInstallationId.PREFERENCE_KEY,
-                    "",
-                ),
-                serviceCommit = BuildConfig.COMMIT_HASH,
-                deviceAttributes =
-                    mapOf(
-                        "device.manufacturer" to Build.MANUFACTURER,
-                        "device.model" to Build.MODEL,
-                        "os.name" to "android",
-                        "os.version" to Build.VERSION.RELEASE,
-                        "os.api_level" to Build.VERSION.SDK_INT.toString(),
-                        // Lets the cloud side split play from sideload installs,
-                        // which share version and commit.
-                        "distribution.channel" to BuildConfig.FLAVOR,
-                    ),
-                suppressedResultValues = setOf("skip"),
-            ),
         )
         installHookBridge()
         installLogSink()
