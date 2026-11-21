@@ -3,8 +3,9 @@ package io.github.magisk317.smscode.runtime.bridge
 import android.content.Context
 import android.net.Uri
 import io.github.magisk317.smscode.data.db.DBManager
-import io.github.magisk317.smscode.db.entity.SmsMsg
-import io.github.magisk317.smscode.runtime.contract.notification.NotificationPlatformBridge
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
+import io.github.magisk317.xposed.runtime.contract.notification.NotificationPlatformBridge
+import io.github.magisk317.smscode.verification.SmsDuplicateCheckResult
 
 /**
  * Bridge interfaces for hook-layer access to runtime services.
@@ -22,7 +23,6 @@ import io.github.magisk317.smscode.runtime.contract.notification.NotificationPla
 interface HookPrefsAccess {
     fun isEnabled(context: Context): Boolean
     fun isVerboseLogMode(context: Context): Boolean
-    fun isSensitiveDebugLogMode(context: Context): Boolean
     fun autoInputCodeEnabled(context: Context): Boolean
     fun getAutoInputCodeDelay(context: Context): Long
     fun getAutoInputCodeIntervalMs(context: Context): Long
@@ -68,7 +68,7 @@ interface HookStorageAccess {
  * Code record export for cross-process file-based IPC.
  */
 interface HookCodeRecordAccess {
-    fun exportToFile(context: Context, smsMsg: SmsMsg): Boolean
+    fun exportToFile(context: Context, smsMsg: SmsMsg, emitDiagnostics: Boolean): Boolean
 }
 
 /**
@@ -79,6 +79,12 @@ interface HookContentProviderAccess {
     fun appInfoContentUri(context: Context): Uri
     fun autoInputEventContentUri(context: Context): Uri
     fun authority(context: Context): String
+    fun querySmsMsgByFingerprint(
+        context: Context,
+        sender: String?,
+        body: String,
+        date: Long,
+    ): SmsDuplicateCheckResult
 
     /**
      * Claims one or more deduplication keys in storage owned by the module app.

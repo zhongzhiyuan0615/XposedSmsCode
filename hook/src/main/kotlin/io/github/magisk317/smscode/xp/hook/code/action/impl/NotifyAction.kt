@@ -10,7 +10,7 @@ import io.github.magisk317.smscode.hook.R
 import io.github.magisk317.smscode.runtime.bridge.HookRuntimeBridge
 import io.github.magisk317.smscode.xp.hook.code.CodeNotificationBroadcastContract
 import io.github.magisk317.smscode.runtime.verification.CodeNotificationDeliveryHelper
-import io.github.magisk317.smscode.db.entity.SmsMsg
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
 import io.github.magisk317.smscode.runtime.verification.NotifyActionHelper
 import io.github.magisk317.smscode.runtime.verification.PhoneOwnedNotificationDispatcher
 import io.github.magisk317.smscode.xp.hook.code.CopyCodeReceiver
@@ -173,6 +173,13 @@ class NotifyAction(
         // empty group header - i.e. exactly the reported "nothing in the status bar".
         if (request.autoCancelEnabled && request.retentionTimeMs > 0L) {
             builder.setTimeoutAfter(request.retentionTimeMs)
+            // Render the remaining retention time as a countdown (issue #274). Mirrors the
+            // app-owned builder in smscode/core CodeNotificationDeliveryHelper so both
+            // delivery paths behave the same; a future `when` makes the system chronometer
+            // count down to the timeoutAfter removal.
+            builder.setUsesChronometer(true)
+            builder.setChronometerCountDown(true)
+            builder.setWhen(System.currentTimeMillis() + request.retentionTimeMs)
         }
         return builder.build()
     }

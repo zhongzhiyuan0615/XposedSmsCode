@@ -2,11 +2,10 @@ package io.github.magisk317.smscode.xp.hook.code.action.impl
 
 import android.content.Context
 import android.content.Intent
-import io.github.magisk317.smscode.common.utils.HookPrefsReader
 import io.github.magisk317.smscode.common.utils.SmsCodeUtils
-import io.github.magisk317.smscode.runtime.common.utils.StringUtils
-import io.github.magisk317.smscode.db.entity.SmsMsg
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
 import io.github.magisk317.smscode.runtime.bridge.HookRuntimeBridge
+import io.github.magisk317.smscode.verification.SmsDuplicateCheckResult
 import io.github.magisk317.smscode.rule.utils.SmsCodeParsedMetadataResolver
 import io.github.magisk317.smscode.runtime.verification.SmsParseAction as SharedSmsParseAction
 import io.github.magisk317.smscode.xp.hook.code.action.CallableAction
@@ -37,20 +36,13 @@ class SmsParseAction(pluginContext: Context, phoneContext: Context, smsMsg: SmsM
             smsIntent = mSmsIntent,
             deduplicateEnabled = mDeduplicateEnabled,
             incomingSmsParser = { SmsMsg.fromIntent(it).toVerificationMessage() },
-            sensitiveDebugLogReader = HookPrefsReader::isSensitiveDebugLogMode,
-            summarizeSender = { sensitive, value ->
-                if (sensitive) StringUtils.escape(value).orEmpty() else StringUtils.summarizeSender(value)
-            },
-            summarizeBody = { sensitive, value ->
-                if (sensitive) StringUtils.escape(value).orEmpty() else StringUtils.summarizeBody(value)
-            },
-            summarizeCode = { sensitive, value ->
-                if (sensitive) StringUtils.escape(value).orEmpty() else StringUtils.summarizeCode(value)
-            },
             duplicateChecker = { sender, body, timestamp ->
-                runCatching {
-                    HookRuntimeBridge.storageAccess.dbManager(mPluginContext).querySmsMsgByFingerprint(sender, body, timestamp) != null
-                }.getOrDefault(false)
+                HookRuntimeBridge.contentProviderAccess.querySmsMsgByFingerprint(
+                    context = mPluginContext,
+                    sender = sender,
+                    body = body,
+                    date = timestamp,
+                )
             },
             preparedSmsResolver = { pluginContext, phoneContext, smsMsg, _, timestamp ->
                 val msgBody = smsMsg.raw.body.orEmpty()

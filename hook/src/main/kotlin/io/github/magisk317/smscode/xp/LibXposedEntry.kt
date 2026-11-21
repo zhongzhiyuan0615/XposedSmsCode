@@ -6,12 +6,14 @@ import io.github.magisk317.smscode.common.utils.HookPrefsReader
 import io.github.magisk317.smscode.xp.hook.code.SmsHandlerHook
 import io.github.magisk317.smscode.xp.hook.me.ModuleUtilsHook
 import io.github.magisk317.smscode.xp.hook.mms.MmsMessagesHook
+import io.github.magisk317.smscode.xp.hook.mms.XscBugleReadStateHost
+import io.github.magisk317.smscode.xposed.hook.vendor.MiuiBugleReadStateHook
 import io.github.magisk317.smscode.xp.hook.telephony.SmsProviderHook
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
-import io.github.magisk317.smscode.xposed.hook.permission.PermissionGranterHook
-import io.github.magisk317.smscode.xposed.hook.system.SystemInputInjectorHook
+import io.github.magisk317.xposed.capability.permission.PermissionGranterHook
+import io.github.magisk317.xposed.capability.system.SystemInputInjectorHook
 import io.github.magisk317.xposed.HookEnv
 import io.github.magisk317.xposed.LibXposedHookApi
 import io.github.magisk317.xposed.logging.XLog
@@ -20,6 +22,8 @@ import io.github.magisk317.xposed.BaseLibXposedEntry
 
 class LibXposedEntry : BaseLibXposedEntry {
 
+    // libxposed instantiates this constructor reflectively, so nothing in the module ever
+    // calls it -- "unused"/"UnusedParameter" silence the IDE inspection, not a compiler warning.
     @Suppress("unused", "UnusedParameter")
     constructor(xposed: XposedInterface, loadedParam: ModuleLoadedParam) : super(xposed, loadedParam)
     constructor() : super()
@@ -29,6 +33,7 @@ class LibXposedEntry : BaseLibXposedEntry {
     override val hooks: List<BaseHook> = listOf(
         SmsHandlerHook(),
         MmsMessagesHook(),
+        MiuiBugleReadStateHook(XscBugleReadStateHost),
         ModuleUtilsHook(),
         PermissionGranterHook(),
         SystemInputInjectorHook(),
@@ -44,12 +49,10 @@ class LibXposedEntry : BaseLibXposedEntry {
         // Diagnostic: test remote prefs reading
         runCatching {
             val prefs = remotePrefsProvider()
-            val sensitiveLog = prefs?.getBoolean("pref_sensitive_debug_log_mode", false)
             val enabled = prefs?.getBoolean("pref_enable", false)
             XLog.w(
-                message = "Hook remotePrefs: prefs=%s sensitiveLog=%s enabled=%s keys=%s",
+                message = "Hook remotePrefs: prefs=%s enabled=%s keys=%s",
                 prefs != null,
-                sensitiveLog,
                 enabled,
                 prefs?.all?.keys?.size,
             )

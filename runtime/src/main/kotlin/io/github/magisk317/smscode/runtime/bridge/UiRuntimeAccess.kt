@@ -3,21 +3,14 @@ package io.github.magisk317.smscode.runtime.bridge
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import io.github.magisk317.smscode.data.db.AppDatabase
-import io.github.magisk317.smscode.data.db.DBManager
-import io.github.magisk317.smscode.db.entity.SmsMsg
-import io.github.magisk317.smscode.runtime.RuntimeApkVerificationResult
 import io.github.magisk317.smscode.runtime.RuntimeBackupExportResult
+import io.github.magisk317.smscode.runtime.contract.record.SmsMsgRecordData
 import io.github.magisk317.smscode.runtime.RuntimeBackupImportResult
 import io.github.magisk317.smscode.runtime.RuntimeBackupRule
 import io.github.magisk317.smscode.runtime.RuntimeBackupSmsRecord
-import io.github.magisk317.smscode.runtime.RuntimeStartupTarget
-import io.github.magisk317.smscode.runtime.RuntimeUpgradeApkAsset
-import io.github.magisk317.smscode.runtime.RuntimeUpgradeCheckResult
-import io.github.magisk317.smscode.runtime.RuntimeUpgradeDownloadProgress
+import io.github.magisk317.smscode.runtime.RuntimeRecordRestoreStats
 import kotlinx.coroutines.flow.Flow
-import java.io.File
-import io.github.magisk317.smscode.data.repository.RoomSmsCodeRuleRepository
+import io.github.magisk317.smscode.rule.repository.SmsCodeRuleRepository
 
 /**
  * UI-layer access gateways to runtime services.
@@ -27,28 +20,32 @@ import io.github.magisk317.smscode.data.repository.RoomSmsCodeRuleRepository
  * The Facade objects implement these interfaces; only the composition root
  * (Application, DI module, XposedRuntimeInstaller) references the concrete objects.
  *
+ * Signatures deal in UI contracts only: rule storage goes through the shared
+ * smscode-core repository, app configs through [UiAppConfig], and backup payloads
+ * through the RuntimeBackup* DTOs. No Room implementation type is exposed here.
+ *
  * Method signatures intentionally omit default parameter values (Kotlin forbids
  * defaults on overrides); every existing call site passes them explicitly.
  */
 
-/** Database access for UI (app list, rules, records). */
+/** Storage gateways for UI (app list, rules, record count). */
 interface UiStorageAccess {
-    fun dbManager(context: Context): DBManager
-    fun appDatabase(context: Context): AppDatabase
-
     /**
-     * Rule storage for the screens.
-     *
-     * The UI goes through this instead of the DAO so it does not depend on Room, and
-     * so both apps can hold their rules the same way even though XSC stores them in
-     * Room and relay through its own repository.
+     * Rule storage for the screens, expressed in the shared [SmsCodeRuleRepository]
+     * contract so neither app depends on the other's Room wiring.
      */
-    fun smsCodeRuleRepository(context: Context): RoomSmsCodeRuleRepository
+    fun smsCodeRuleRepository(context: Context): SmsCodeRuleRepository
+
+    /** App config storage for the app list screens, expressed in [UiAppConfig]. */
+    fun appConfigRepository(context: Context): UiAppConfigRepository
+
+    /** Emits the total stored SMS record count and re-emits whenever it changes. */
+    fun smsRecordCountFlow(context: Context): Flow<Long>
 }
 
 /** File-backed entity store (app blocked-config mirror). */
 interface UiStoreAccess {
-    fun persistAppConfigs(context: Context, appConfigs: List<io.github.magisk317.smscode.db.entity.AppInfo>): Boolean
+    fun persistAppConfigs(context: Context, appConfigs: List<UiAppConfig>): Boolean
 }
 
 /** Backup / restore SAF intents and payload import/export. */
@@ -66,15 +63,33 @@ interface UiBackupAccess {
     ): RuntimeBackupExportResult
     fun importRuleList(context: Context, uri: Uri, currentAppVersion: String): RuntimeBackupImportResult
     fun restoreDatabaseFromBackup(context: Context, uri: Uri): Boolean
+
+    /** Reads every stored rule as a backup payload row. */
+    fun queryBackupRules(context: Context): List<RuntimeBackupRule>
+
+    /** Reads every stored SMS record as a backup payload row. */
+    fun queryBackupSmsRecords(context: Context): List<RuntimeBackupSmsRecord>
+
+    /** Re-inserts backup rules into storage, preserving import semantics. */
+    suspend fun restoreRulesFromBackup(context: Context, rules: List<RuntimeBackupRule>)
+
+    /**
+     * Re-inserts backup records into storage and returns the row counts observed
+     * before and after, for restore diagnostics.
+     */
+    suspend fun restoreRecordsFromBackup(
+        context: Context,
+        records: List<RuntimeBackupSmsRecord>,
+    ): RuntimeRecordRestoreStats
 }
 
 /** SMS code record CRUD + export for the record screen/viewmodel. */
 interface UiCodeRecordAccess {
-    fun recordsFlow(context: Context): Flow<List<SmsMsg>>
-    fun queryRecords(context: Context): List<SmsMsg>
-    suspend fun removeRecords(context: Context, records: List<SmsMsg>)
-    suspend fun restoreRecords(context: Context, records: List<SmsMsg>)
-    fun exportCodeRecords(context: Context, uri: Uri, records: List<SmsMsg>): Boolean
+    fun recordsFlow(context: Context): Flow<List<SmsMsgRecordData>>
+    fun queryRecords(context: Context): List<SmsMsgRecordData>
+    suspend fun removeRecords(context: Context, records: List<SmsMsgRecordData>)
+    suspend fun restoreRecords(context: Context, records: List<SmsMsgRecordData>)
+    fun exportCodeRecords(context: Context, uri: Uri, records: List<SmsMsgRecordData>): Boolean
 }
 
 /** Notification permission/diagnostics for the settings screen. */
@@ -82,43 +97,7 @@ interface UiNotificationAccess {
     fun hasPostNotificationsPermission(context: Context): Boolean
 }
 
-/** App-local preference reads needed by UI screens (debug log flag, SIM remark). */
+/** App-local preference reads needed by UI screens. */
 interface UiPrefsAccess {
-    suspend fun isSensitiveDebugLogMode(context: Context): Boolean
     suspend fun getSimSlotRemark(context: Context, simSlot: Int): String
-}
-
-/** App update: GitHub check/download/install + Play flow decisions. */
-interface UiUpdateAccess {
-    suspend fun fetchUpgradeInfo(): RuntimeUpgradeCheckResult
-    fun isNewer(current: String, latest: String): Boolean
-    fun isNewer(current: Long, latest: Long): Boolean
-    fun selectBestApkForDevice(apks: List<RuntimeUpgradeApkAsset>): RuntimeUpgradeApkAsset?
-    suspend fun download(
-        context: Context,
-        versionCode: Long,
-        asset: RuntimeUpgradeApkAsset,
-        onProgress: (RuntimeUpgradeDownloadProgress) -> Unit,
-    ): File
-    fun verifyDownloadedApk(
-        context: Context,
-        apkFile: File,
-        expectedSha256: String,
-        expectedSigningCertSha256: String,
-    ): RuntimeApkVerificationResult
-    fun canRequestPackageInstalls(context: Context): Boolean
-    fun buildUnknownSourceSettingsIntent(context: Context): Intent
-    fun installApk(context: Context, apkFile: File): Result<Unit>
-    fun resolveStartupTarget(installedFromPlay: Boolean): RuntimeStartupTarget
-    fun shouldSkipGithubCheckOnStartup(
-        installedFromPlay: Boolean,
-        autoCheckEnabled: Boolean,
-        wifiOnly: Boolean,
-        onWifi: Boolean,
-    ): Boolean
-    fun shouldSkipIgnoredVersion(
-        respectIgnoredVersion: Boolean,
-        ignoredVersion: String,
-        latestVersion: String,
-    ): Boolean
 }

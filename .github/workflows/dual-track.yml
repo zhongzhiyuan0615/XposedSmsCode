@@ -7,13 +7,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Manual-only by policy (2026-10-25): automatic triggers are removed so this file
+# can never start on its own. Release automation is driven from the project's
+# primary CI host; runs on this mirror are operator-initiated, and the inputs
+# below are the only way any publishing step turns on.
 on:
-  pull_request:
-  push:
-    branches:
-      - beta
-      - master
-      - main
   workflow_dispatch:
 
 jobs:
@@ -35,8 +33,8 @@ jobs:
             echo "::notice::GITLAB_TOKEN secret not set; fetching the public CI toolkit anonymously"
           fi
       - name: Check dual-track contract
-        run: python3 scripts/checks/dual_track_check.py --root .
+        run: python3 "${MAGISK_CI_TOOLKIT_DIR:-.magisk-ci-toolkit}/checks/dual_track_check.py" --root . --config scripts/config/dual-track.json
       - name: Check CI bootstrap freshness
         run: |
           TOOLKIT_DIR="$(bash scripts/resolve_ci_toolkit.sh)"
-          bash "$TOOLKIT_DIR/codegen/sync_consumer_bootstrap.sh" --check "$PWD" v1
+          bash "$TOOLKIT_DIR/codegen/sync_consumer_bootstrap.sh" --check "$PWD" "b2d1d58abfca674a60277ba302d06eae45da3ce4"

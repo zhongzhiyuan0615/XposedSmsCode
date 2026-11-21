@@ -16,17 +16,36 @@ buildscript {
             // not reach the plugin classpath). Deliberately outside the managed
             // block: the dependency-force workflow rewrites that block wholesale
             // and would drop the comment on its next run.
-            force("org.ow2.asm:asm:9.11")
-            force("org.ow2.asm:asm-analysis:9.11")
-            force("org.ow2.asm:asm-commons:9.11")
-            force("org.ow2.asm:asm-tree:9.11")
-            force("org.ow2.asm:asm-util:9.11")
+            force("org.ow2.asm:asm:9.11.1")
+            force("org.ow2.asm:asm-analysis:9.11.1")
+            force("org.ow2.asm:asm-commons:9.11.1")
+            force("org.ow2.asm:asm-tree:9.11.1")
+            force("org.ow2.asm:asm-util:9.11.1")
         }
     }
 }
 
+
+// Java 27 bytecode target, lint side: AGP 9.5.0-rc01's lint-api (32.5.0-rc01)
+// resolves ASM 9.9 (V26 max) on androidLintTool, so lintAnalyze skips every
+// major-71 class with "broken class file?" warnings while the job stays green.
+// The buildscript force above does not reach project configurations; force the
+// same family here until the lint toolchain ships ASM >= 9.10 itself.
+allprojects {
+    configurations.configureEach {
+        if (name == "androidLintTool") {
+            resolutionStrategy {
+                force("org.ow2.asm:asm:9.11.1")
+                force("org.ow2.asm:asm-analysis:9.11.1")
+                force("org.ow2.asm:asm-commons:9.11.1")
+                force("org.ow2.asm:asm-tree:9.11.1")
+                force("org.ow2.asm:asm-util:9.11.1")
+            }
+        }
+    }
+}
 plugins {
-    id("nl.littlerobots.version-catalog-update") version "1.1.1"
+    id("nl.littlerobots.version-catalog-update") version "1.1.2"
     id("magisk.android.application") apply false
     id("magisk.android.library") apply false
     alias(libs.plugins.kotlin.android) apply false
@@ -45,7 +64,34 @@ plugins {
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.kover) apply false
     id("magisk.maintenance")
+    id("magisk.distribution.policy")
 }
+
+// Which distributions this app ships as and what each one compiles in. This is
+// product data, so it belongs here rather than in the shared convention: the
+// convention owns only the mechanism that turns this table into AGP flavors.
+//
+// Play and GitHub are the active channels. F-Droid is paused - the commented
+// flavor in each channel block is the single resume point, so a paused
+// distribution stays a documented state instead of becoming a flavor that was
+// quietly dropped.
+magiskDistribution {
+    flavor("play") {
+        buildConfigBoolean("ENABLE_SMS_CHANNEL", false)
+        buildConfigBoolean("ALLOW_HTTP_WEBHOOK", true)
+        buildConfigBoolean("ENABLE_ACCESSIBILITY_AUTO_INPUT", false)
+        buildConfigBoolean("HAS_BILLING", true)
+    }
+    flavor("github") {
+        buildConfigBoolean("ENABLE_SMS_CHANNEL", true)
+        buildConfigBoolean("ALLOW_HTTP_WEBHOOK", true)
+        buildConfigBoolean("ENABLE_ACCESSIBILITY_AUTO_INPUT", true)
+        buildConfigBoolean("HAS_BILLING", false)
+    }
+    // F-Droid paused: re-enable the flavor above and add it here to restore it.
+    // flavor("fdroid") { ... }
+}
+
 
 val catalog = libs
 val enableKover = providers.gradleProperty("enableKover")
@@ -92,6 +138,13 @@ subprojects {
     pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
         configureDetekt()
     }
+    // Multiplatform modules (the kit's logging/keepalive, magisk-ui-kit and the
+    // desktop modules) matched none of the hooks above, so they got no detekt task at all and
+    // their findings were never computed. Same treatment as the Android modules: analysed, and
+    // non-blocking until each one is measured.
+    pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
+        configureDetekt()
+    }
     pluginManager.withPlugin("org.jetbrains.kotlin.android") {
         configureDetekt()
     }
@@ -107,13 +160,15 @@ val sharedCoreProjectPaths = listOf(
     ":smscode-core:rule",
     ":smscode-core:runtime",
     ":smscode-core:verification",
+    ":smscode-core:verification-runtime",
+    ":smscode-core:db",
 )
 val forbiddenMainModuleDependencies = buildMap {
-    put(":runtime", setOf(":app", ":core", ":hook"))
-    put(":hook", setOf(":app", ":core"))
-    put(":core", setOf(":app", ":hook"))
+    put(":runtime", setOf(":app", ":presentation", ":hook"))
+    put(":hook", setOf(":app", ":presentation"))
+    put(":presentation", setOf(":app", ":hook"))
     sharedCoreProjectPaths.forEach { sourcePath ->
-        put(sourcePath, setOf(":app", ":core", ":runtime", ":magisk-ui-kit"))
+        put(sourcePath, setOf(":app", ":presentation", ":runtime", ":magisk-ui-kit"))
     }
 }
 
@@ -153,21 +208,35 @@ val verifyMainModuleDependencies = tasks.register("verifyMainModuleDependencies"
 }
 
 val verifyModuleBoundaries = tasks.register("verifyModuleBoundaries") {
+    dependsOn(":smscode-core:verifyModuleBoundaries")
     group = "verification"
-    description = "Run root module-boundary checks for app/core/runtime and shared smscode-core."
+    description = "Run root module-boundary checks for app/presentation/runtime and shared smscode-core."
 
     dependsOn(
         verifyMainModuleDependencies,
         ":app:verifyNoLocalVerificationEngine",
-        ":core:verifyNoRuntimeStorageImplLeak",
+        ":presentation:verifyNoRuntimeStorageImplLeak",
         ":runtime:verifyNoComposeUiLeak",
     )
+}
+
+tasks.register<Exec>("verifyNoGlobalWarningMute") {
+    group = "verification"
+    description = "Ensure the Kotlin discarded-result diagnostics stay enabled; tolerated failures must be explicit at the call site."
+    workingDir = rootProject.projectDir
+    commandLine("bash", "${rootProject.projectDir}/scripts/verify_no_global_warning_mute.sh")
+}
+
+tasks.register<Exec>("verifyCiToolkitRef") {
+    group = "verification"
+    description = "Verify all magisk-ci-toolkit references remain pinned to one full SHA."
+    commandLine("bash", "${System.getenv("MAGISK_CI_TOOLKIT_DIR") ?: ".magisk-ci-toolkit"}/ci/verify_toolkit_pin.sh", "--root", project.projectDir.absolutePath)
 }
 
 tasks.register("check") {
     group = "verification"
     description = "Run root project verification checks."
-    dependsOn(verifyModuleBoundaries)
+    dependsOn(verifyModuleBoundaries, "verifyNoGlobalWarningMute", "verifyCiToolkitRef")
 }
 
 tasks.register<Delete>("clean") {
@@ -175,3 +244,5 @@ tasks.register<Delete>("clean") {
 }
 
 // Maintenance task now automatically hooked via magisk.maintenance plugin
+
+

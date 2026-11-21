@@ -6,6 +6,11 @@ import io.github.magisk317.smscode.data.db.DBProvider
 import io.github.magisk317.smscode.runtime.RuntimeCodeRecordRestoreFacade
 import io.github.magisk317.smscode.runtime.RuntimeNotificationFacade
 import io.github.magisk317.smscode.common.utils.HookPrefsReader
+import io.github.magisk317.smscode.common.utils.ProviderIpcTokenGate
+import io.github.magisk317.smscode.runtime.common.provider.HookFingerprintQuery
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
+import io.github.magisk317.smscode.verification.SmsDuplicateCheckResult
+import io.github.magisk317.smscode.verification.resolveSmsDuplicateCheck
 import io.github.magisk317.smscode.runtime.RuntimeStorageFacade
 import io.github.magisk317.smscode.runtime.bridge.HookContentProviderAccess
 import io.github.magisk317.smscode.runtime.bridge.HookRuntimeGateClaimResult
@@ -27,6 +32,27 @@ internal object AppShellRuntimeBridge {
                     DBProvider.autoInputEventContentUri(context)
 
                 override fun authority(context: Context): String = DBProvider.authority(context)
+
+                override fun querySmsMsgByFingerprint(
+                    context: Context,
+                    sender: String?,
+                    body: String,
+                    date: Long,
+                ): SmsDuplicateCheckResult {
+                    val token = HookPrefsReader.getIpcToken(context)
+                    if (token.isBlank()) return SmsDuplicateCheckResult.UNAVAILABLE
+                    return HookFingerprintQuery.query(
+                        context = context,
+                        uri = ProviderIpcTokenGate.attachToken(
+                            DBProvider.smsMsgContentUri(context),
+                            token,
+                        ),
+                        sender = sender,
+                        body = body,
+                        date = date,
+                        msgType = SmsMsg.MSG_TYPE_SMS,
+                    )
+                }
 
                 override fun claimRuntimeGate(
                     context: Context,

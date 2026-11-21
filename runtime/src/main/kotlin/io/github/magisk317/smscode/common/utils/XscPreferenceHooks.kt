@@ -21,7 +21,6 @@ object XscPreferenceHooks : AppPreferencesHooks {
             PrefConst.KEY_SETTINGS_ACCORDION_MODE,
             AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_SETTINGS_ACCORDION_MODE, true),
         )
-        editor.putBoolean(PrefConst.KEY_VERBOSE_LOG_MODE, AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_VERBOSE_LOG_MODE, false))
         editor.putInt(
             PrefConst.KEY_RUNTIME_LOG_RETENTION_DAYS,
             AppPreferencesDataStore.getInt(
@@ -29,10 +28,6 @@ object XscPreferenceHooks : AppPreferencesHooks {
                 PrefConst.KEY_RUNTIME_LOG_RETENTION_DAYS,
                 PrefConst.RUNTIME_LOG_RETENTION_DAYS_DEFAULT,
             ).coerceAtLeast(PrefConst.RUNTIME_LOG_RETENTION_DAYS_MIN),
-        )
-        editor.putBoolean(
-            PrefConst.KEY_SENSITIVE_DEBUG_LOG_MODE,
-            AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_SENSITIVE_DEBUG_LOG_MODE, false),
         )
         editor.putBoolean(
             PrefConst.KEY_ENABLE_AUTO_INPUT_CODE,
@@ -146,14 +141,6 @@ object XscPreferenceHooks : AppPreferencesHooks {
                 PrefConst.KEY_HISTORY_LIMIT_CALL_NOTIFY,
                 "20",
             ),
-        )
-        editor.putBoolean(
-            PrefConst.KEY_AUTO_UPDATE_ON_START,
-            AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_AUTO_UPDATE_ON_START, true),
-        )
-        editor.putBoolean(
-            PrefConst.KEY_AUTO_UPDATE_WIFI_ONLY,
-            AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_AUTO_UPDATE_WIFI_ONLY, false),
         )
         editor.putInt(
             PrefConst.KEY_CHOOSE_THEME,

@@ -2,6 +2,62 @@
 
 本日志记录了项目重构后的主要变更。
 
+
+---
+## [v3.4.5] - 2026-11-17
+- 版本：`versionCode 139` / `versionName 3.4.5`。
+- 下一轮开发占位，发布前补充具体变更。
+
+> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.4.4...v3.4.5
+
+---
+## [v3.4.4] - 2026-11-16
+- 版本：`versionCode 138` / `versionName 3.4.4`。
+- `[feat]` 优化 WebDAV 备份与恢复功能。
+- `[feat]` 标记已读尝试回归。#273
+- `[feat]` 新增俄语。#272
+- `[fix]`  改进短信处理后的恢复体验。#271
+- `[deps]` 升级 Kotlin 2.5.0 RC、Gradle 9.9.1 与相关依赖。
+
+> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.4.3...v3.4.4
+
+---
+## [v3.4.3] - 2026-11-07
+- 版本：`versionCode 137` / `versionName 3.4.3`。
+- `[ui]` 优化设置页与偏好控件。
+- `[sms]` 整理短信拦截、解析与自动输入链路。
+- `[log]` 日志策略按构建通道区分。
+- `[deps]` 升级 AGP 9.5.1 及相关依赖。
+
+> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.4.2...v3.4.3
+
+---
+## [v3.4.2] - 2026-10-31
+- 版本：`versionCode 136` / `versionName 3.4.2`。
+- `[db]` 单步迁移剥离 sms_msg 的 forward 残留列，移除未用配置表
+- `[refactor]` 共享层命名归位，子模块 pin 对齐
+- `[deps]` 升级 Gradle 9.9.0-rc-1、AGP 9.5.0，共享库 pin 对齐
+
+> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.4.1...v3.4.2
+
+---
+## [v3.4.1] - 2026-10-24
+- 版本：`versionCode 135` / `versionName 3.4.1`。
+- `[log]` 日志策略随构建类型调整
+- `[fix]` 修复校验服务不可用时的重复短信校验
+- `[docs]` 更新架构与隐私说明
+
+> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.4.0...v3.4.1
+
+---
+## [v3.4.0] - 2026-10-18
+- 版本：`versionCode 134` / `versionName 3.4.0`。
+- `[feat]` 更新支持 OTA 与分发渠道分流。
+- `[fix]` 修复偏好服务延迟绑定导致 service.instance.id 丢失。
+- `[fix]` 修复重复 DataStore 实例导致的崩溃。
+- `[fix]` 修复日志导出阻塞原因不显示。
+> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.3.9...v3.4.0
+
 ---
 ## [v3.3.11] - 2026-10-16
 - 版本：`versionCode 135` / `versionName 3.3.11`。
@@ -13,13 +69,6 @@
 - `[fix]` 修复两处已存在的 detekt 超长行，使质量门禁全绿。
 
 > Full Changelog: https://github.com/zhongzhiyuan0615/XposedSmsCode/compare/v3.3.10...v3.3.11
-
----
-## [v3.3.10] - Unreleased
-- 版本：`versionCode 134` / `versionName 3.3.10`。
-- 下一轮开发占位，发布前补充具体变更。
-
-> Full Changelog: https://gitlab.com/magisk3171/XposedSmsCode/-/compare/v3.3.9...v3.3.10
 
 ---
 ## [v3.3.9] - 2026-10-12

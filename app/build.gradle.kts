@@ -1,6 +1,6 @@
 plugins {
     id("magisk.android.application")
-    id("smscode.android.common")
+    id("magisk.android.distribution")
     id("magisk.app.signing")
     id("magisk.app.packaging")
     id(libs.plugins.kotlin.parcelize.get().pluginId)
@@ -34,13 +34,20 @@ val syncSmsCodeRulesAssets = tasks.register<Sync>("syncSmsCodeRulesAssets") {
     into(generatedSmsCodeRulesAssetsDir.map { it.dir("smscode-rules") })
 }
 
+val verifySmsCodeRulesIndex = tasks.register<org.gradle.api.tasks.Exec>("verifySmsCodeRulesIndex") {
+    group = "verification"
+    inputs.file(rootProject.layout.projectDirectory.file("smscode/rules/_meta/rules-index.json"))
+    workingDir(rootProject.layout.projectDirectory.dir("smscode/rules").asFile)
+    commandLine("python3", "tools/build_index.py", "--check")
+}
+
 android {
     namespace = "com.github.tianma8023.xposed.smscode"
     ndkVersion = ndkVersionStr
 
 
     androidResources {
-        localeFilters.addAll(listOf("en", "zh-rCN", "zh-rTW"))
+        localeFilters.addAll(listOf("en", "ru", "zh-rCN", "zh-rTW"))
     }
 
     defaultConfig {
@@ -65,7 +72,7 @@ android {
         }
         // Sources live under src/<name>/kotlin. AGP compiles src/<name>/java by default, so
         // each source set is pointed at the kotlin directory explicitly.
-        listOf("main", "test", "github", "fdroid", "play").forEach { name ->
+        listOf("main", "test", "github", "play").forEach { name ->
             findByName(name)?.kotlin?.directories?.add("src/$name/kotlin")
         }
     }
@@ -82,27 +89,36 @@ android {
 }
 
 tasks.named("preBuild") {
-    dependsOn(syncSmsCodeRulesAssets)
+    dependsOn(syncSmsCodeRulesAssets, verifySmsCodeRulesIndex)
+}
+
+tasks.named("check") {
+    dependsOn(verifySmsCodeRulesIndex)
 }
 
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
-    implementation(project(":core"))
+    implementation(project(":presentation"))
     implementation(project(":magisk-ui-kit"))
-    implementation(project(":magisk-ui-kit:update"))
+    implementation(project(":magisk-ui-kit:governance"))
     implementation(project(":hook"))
     implementation(project(":runtime"))
     implementation(project(":smscode-core:domain"))
     implementation(project(":smscode-core:runtime"))
+    implementation(project(":smscode-core:verification-runtime"))
+    implementation(project(":smscode-core:rule"))
+    implementation(project(":smscode-core:db"))
     implementation(project(":smscode-core:verification"))
     implementation(project(":smscode-core:hook"))
     implementation(project(":magisk-xposed-kit"))
+    implementation(project(":magisk-xposed-kit:capability"))
+    implementation(project(":magisk-xposed-kit:runtime"))
     implementation(project(":magisk-xposed-kit:logging"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.livedata.ktx)
     compileOnly(libs.libxposed.api)
-    implementation(libs.libxposed.service)
+    implementation(project(":magisk-xposed-kit:service"))
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
@@ -130,26 +146,21 @@ val verifyNoLocalVerificationEngine = tasks.register("verifyNoLocalVerificationE
     group = "verification"
     description = "Ensure the app shell owns neither hook runtime code nor a local verification engine."
 
-    val bannedFiles = listOf(
-        "src/main/java/com/github/magisk317/smscode/xp/hook/code/InboundSmsBlocker.kt",
-        "src/main/java/com/github/magisk317/smscode/xp/hook/code/InboundSmsMethodInvoker.kt",
-        "src/main/java/com/github/magisk317/smscode/xp/hook/code/SmsIntentHookSupport.kt",
-    )
     val projectRoot = layout.projectDirectory.asFile
-    val hookSourceDir = projectRoot.resolve("src/main/java/com/github/magisk317/smscode/xp")
+    val sourceRoots = listOf("src/main/kotlin", "src/main/java").map(projectRoot::resolve)
+    val forbiddenPackagePath = "/io/github/magisk317/smscode/xp/"
 
-    inputs.files(bannedFiles.map(projectRoot::resolve))
-    inputs.files(fileTree(hookSourceDir) { include("**/*.kt") })
+    inputs.files(sourceRoots)
 
     doLast {
-        val violations = bannedFiles
-            .map(projectRoot::resolve)
-            .filter(File::exists)
-            .map { it.relativeTo(projectRoot).path } +
-            hookSourceDir.walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
+        val violations = sourceRoots.flatMap { root ->
+            if (!root.exists()) return@flatMap emptyList()
+            root.walkTopDown()
+                .filter { it.isFile && it.extension in setOf("kt", "java") }
+                .filter { it.path.replace(File.separatorChar, '/').contains(forbiddenPackagePath) }
                 .map { it.relativeTo(projectRoot).path }
                 .toList()
+        }
 
         if (violations.isNotEmpty()) {
             error(

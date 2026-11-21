@@ -11,12 +11,12 @@ import io.github.magisk317.smscode.common.constant.NotificationConst
 import io.github.magisk317.smscode.runtime.bridge.HookRuntimeBridge
 import io.github.magisk317.smscode.common.utils.SmsBlacklistUtils
 import io.github.magisk317.xposed.logging.XLog
-import io.github.magisk317.smscode.db.entity.SmsMsg
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
 import io.github.magisk317.smscode.xp.helper.ModuleConflictArbiter
 import io.github.magisk317.smscode.xp.helper.SmsCodeConflictNoticeHelper
 import io.github.magisk317.smscode.hook.R
 import io.github.magisk317.smscode.runtime.verification.SmsDispatchChainBlockDeduplicator
-import io.github.magisk317.smscode.xposed.helper.SmsHookContextRecovery
+import io.github.magisk317.xposed.capability.helper.SmsHookContextRecovery
 import io.github.magisk317.smscode.runtime.verification.SmsIntentHookSupport as VerificationSmsIntentHookSupport
 import io.github.magisk317.xposed.HookHelpers
 import io.github.magisk317.xposed.BaseHook
@@ -24,19 +24,22 @@ import io.github.magisk317.smscode.xposed.hook.telephony.InboundSmsBlocker
 import io.github.magisk317.smscode.xposed.hook.telephony.SmsRoutingProbeResolver
 import io.github.magisk317.smscode.xposed.hook.telephony.InboundSmsHookClaim
 import io.github.magisk317.smscode.xposed.hook.telephony.InboundSmsHookInstaller
-import io.github.magisk317.smscode.xp.hook.SmsHookRuntimeContext
-import io.github.magisk317.smscode.xp.hook.SmsHookRuntimeSession
+import io.github.magisk317.smscode.xposed.hook.telephony.SmsHookRuntimeContext
+import io.github.magisk317.smscode.xposed.hook.telephony.SmsHookRuntimeSession
+import io.github.magisk317.smscode.xp.hook.helper.XscHookHostCapabilities
 import io.github.magisk317.smscode.xp.hook.code.action.impl.OperateSmsAction
-import io.github.magisk317.smscode.runtime.common.sim.SmsRoutingIntentExtras
+import io.github.magisk317.xposed.runtime.contract.sim.SmsRoutingIntentExtras
 import io.github.magisk317.smscode.runtime.verification.PendingSmsReplayQueue
 import io.github.magisk317.xposed.HookEnv
 import io.github.magisk317.xposed.MethodHook
 import io.github.magisk317.xposed.LoadParam
 import io.github.magisk317.xposed.MethodHookParam
-import io.github.magisk317.smscode.runtime.contract.logging.LogRoute
+import io.github.magisk317.xposed.runtime.contract.logging.LogRoute
 import io.github.magisk317.smscode.runtime.verification.SmsDispatchIntentDeduplicator
 import java.lang.reflect.Method
 import java.util.Collections
+import io.github.magisk317.smscode.runtime.verification.BoundedSmsRetryQueue
+import io.github.magisk317.smscode.runtime.verification.SmsProcessingState
 import java.util.concurrent.Executors
 
 /**
@@ -44,10 +47,22 @@ import java.util.concurrent.Executors
  */
 class SmsHandlerHook : BaseHook() {
 
-    private val runtimeSession = SmsHookRuntimeSession(SMSCODE_PACKAGE)
+    private val runtimeSession: SmsHookRuntimeSession = XscHookHostCapabilities.smsHookRuntimeSession
     private var smsInboxObserver: SmsInboxObserver? = null
     private val inboundSmsBlocker = InboundSmsBlocker(SMS_HANDLER_CLASS)
-    private val smsOperationExecutor = Executors.newSingleThreadExecutor()
+    private val smsOperationExecutor = Executors.newSingleThreadScheduledExecutor()
+    private val blockedSmsRecovery = BoundedSmsRetryQueue(
+        scheduler = smsOperationExecutor,
+        onFinished = { eventId, reason, attempts ->
+            XLog.w(
+                message = "Blocked SMS recovery: event_id=%s result=%s attempts=%d",
+                eventId,
+                reason.name.lowercase(),
+                attempts,
+            )
+        },
+    )
+
     private val constructorInitializer = createXscConstructorInitializer(
         runtimeInitializer = runtimeSession::initialize,
         notificationChannelInitializer = { runtime -> initNotificationChannel(runtime) },
@@ -76,10 +91,14 @@ class SmsHandlerHook : BaseHook() {
 
     override fun onHotReloading() {
         // Release resources owned by the old module ClassLoader before libxposed hot reload.
+        hookClaim.reset()
         smsInboxObserver?.unregister()
         smsInboxObserver = null
+        blockedSmsRecovery.close()
+        SmsProcessingState.clear()
         smsOperationExecutor.shutdownNow()
         runtimeSession.currentOrResolve()?.let { CopyCodeReceiver.unregisterMe(it.phoneContext) }
+        runtimeSession.reset()
     }
 
 
@@ -523,23 +542,29 @@ class SmsHandlerHook : BaseHook() {
         action: String?,
     ): Boolean {
         return runCatching {
-            if (eventId.isBlank() || action.isNullOrBlank()) return false
-            val claim = HookRuntimeBridge.contentProviderAccess.claimRuntimeGate(
-                context = pluginContext,
-                fileName = SmsDispatchIntentDeduplicator.DEFAULT_FILE_NAME,
-                keys = listOf("$eventId|$action"),
-                windowMs = SmsDispatchIntentDeduplicator.DEFAULT_WINDOW_MS,
-                maxEntries = SmsDispatchIntentDeduplicator.DEFAULT_MAX_ENTRIES,
+            val result = dispatchIntentDeduplicator.shouldSkipEverywhere(
+                eventId = eventId,
+                action = action,
+                claimShared = { key, windowMs, maxEntries ->
+                    val claim = HookRuntimeBridge.contentProviderAccess.claimRuntimeGate(
+                        context = pluginContext,
+                        fileName = SmsDispatchIntentDeduplicator.DEFAULT_FILE_NAME,
+                        keys = listOf(key),
+                        windowMs = windowMs,
+                        maxEntries = maxEntries,
+                    )
+                    SmsDispatchIntentDeduplicator.SharedClaimResult(claimed = claim.claimed, ageMs = claim.ageMs)
+                },
             )
-            if (!claim.claimed) {
+            if (result.shouldSkip) {
                 XLog.d(
-                    message = "Diag SMS dispatch duplicate skip: event_id=%s action=%s source=shared_store ageMs=%d",
+                    message = "Diag SMS dispatch duplicate skip: event_id=%s action=%s ageMs=%d",
                     eventId,
                     action,
-                    claim.ageMs ?: 0L,
+                    result.ageMs ?: 0L,
                 )
             }
-            !claim.claimed
+            result.shouldSkip
         }.onFailure {
             XLog.w(
                 message = "Diag SMS dispatch shared dedup failed: event_id=%s action=%s err=%s",
@@ -586,10 +611,20 @@ class SmsHandlerHook : BaseHook() {
             reason,
             eventId,
         )
-        // CodeWorker.parse() is async: only does toast/notification/clipboard side effects.
-        // The block decision was already made above. Don't block the dispatch chain.
-        smsOperationExecutor.execute {
-            CodeWorker(pluginContext, phoneContext, intent, eventId).parse()
+        // Take responsibility before suppressing delivery. A full/closed queue leaves the
+        // original SMS available to the system; blacklist blocking keeps its existing policy.
+        if (reason == SmsBlockEvaluator.BLOCK_REASON_PREF_BLOCK) {
+            val accepted = blockedSmsRecovery.submit(eventId) {
+                CodeWorker(pluginContext, phoneContext, intent, eventId).parse() != null
+            }
+            if (!accepted) {
+                XLog.w(message = "SMS block skipped: recovery unavailable event_id=%s", eventId)
+                return
+            }
+        } else {
+            smsOperationExecutor.execute {
+                CodeWorker(pluginContext, phoneContext, intent, eventId).parse()
+            }
         }
         val inbound = param.thisObject ?: return
         val smsReceiver = VerificationSmsIntentHookSupport.findRawTableReceiver(param.args)
@@ -669,6 +704,7 @@ class SmsHandlerHook : BaseHook() {
         private const val DISPATCH_HANDLER_KEY = "sms_handler"
         private val installedHookKeys = Collections.synchronizedSet(mutableSetOf<String>())
         private val dispatchChainBlockDeduplicator = SmsDispatchChainBlockDeduplicator()
+        private val dispatchIntentDeduplicator = SmsDispatchIntentDeduplicator()
 
         fun isSmsHandlerPackage(packageName: String): Boolean {
             return packageName == ANDROID_PHONE_PACKAGE || packageName == XIAOMI_PHONE_PACKAGE

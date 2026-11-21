@@ -1,0 +1,186 @@
+plugins {
+    id("magisk.android.library")
+    id("magisk.android.compose")
+    alias(libs.plugins.kotlin.serialization)
+    id("magisk.android.distribution")
+}
+
+val versionNameStr = rootProject.providers.gradleProperty("versionName")
+    .orElse(libs.versions.versionName)
+    .get()
+val versionCodeInt = rootProject.providers.gradleProperty("versionCode")
+    .map { requireNotNull(it.toIntOrNull()) { "Invalid -PversionCode=$it" } }
+    .orElse(libs.versions.versionCode.map { it.toInt() })
+    .get()
+
+val allowConflictBypass = findProperty("allowConflictBypass")
+    ?.toString()
+    ?.toBooleanStrictOrNull()
+    ?: false
+
+android {
+    namespace = "io.github.magisk317.smscode.presentation"
+
+    defaultConfig {
+        buildConfigField("int", "VERSION_CODE", versionCodeInt.toString())
+        buildConfigField("String", "VERSION_NAME", "\"$versionNameStr\"")
+        buildConfigField("boolean", "ALLOW_CONFLICT_BYPASS", allowConflictBypass.toString())
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    lint {
+        disable.add("MissingTranslation")
+        disable.add("LocalContextGetResourceValueCall")
+    }
+
+    sourceSets {
+        listOf("main", "test", "play").forEach { name ->
+            getByName(name).kotlin.directories.add("src/$name/kotlin")
+        }
+        listOf("github").forEach { flavor ->
+            getByName(flavor).kotlin.directories.add("src/$flavor/kotlin")
+            getByName(flavor).kotlin.directories.add("src/nonPlay/kotlin")
+        }
+    }
+}
+
+dependencies {
+    implementation(project(":magisk-xposed-kit:contract"))
+    implementation(libs.okhttp)
+    implementation(project(":runtime"))
+    api(project(":magisk-ui-kit"))
+    api(project(":magisk-ui-kit:governance"))
+    implementation(project(":magisk-ui-kit:backup"))
+    implementation(project(":magisk-xposed-kit:logging"))
+    implementation(project(":magisk-xposed-kit:runtime"))
+    implementation(project(":magisk-xposed-kit:diagnostics"))
+    implementation(project(":magisk-xposed-kit:permission"))
+    implementation(project(":smscode-core:domain"))
+    implementation(project(":smscode-core:rule"))
+    implementation(project(":smscode-core:runtime"))
+    implementation(project(":smscode-core:db"))
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.material.icons.core)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+    implementation(libs.koin.compose.viewmodel)
+    implementation(libs.timber)
+    implementation(libs.kotlinx.collections.immutable)
+    add("playImplementation", project(":magisk-ui-kit:billing"))
+
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.mockk)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+val verifyNoRuntimeStorageImplLeak = tasks.register("verifyNoRuntimeStorageImplLeak") {
+    group = "verification"
+    description = "Ensure the presentation module does not directly depend on runtime storage/update implementation types."
+
+    val sourceRoot = layout.projectDirectory.dir("src")
+    val recordSourceRoot = layout.projectDirectory.dir("src/main/kotlin/io/github/magisk317/smscode/ui/record")
+    // The UI bridge declaration is the contract surface: if a Room implementation or
+    // entity type shows up in a signature here, every consumer regains a direct path
+    // to storage internals, so the declaration file itself is guarded too.
+    val uiBridgeDeclaration = rootProject.layout.projectDirectory.file(
+        "runtime/src/main/kotlin/io/github/magisk317/smscode/runtime/bridge/UiRuntimeAccess.kt",
+    )
+    val projectRoot = layout.projectDirectory.asFile
+    val bannedRegexes = listOf(
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.runtime\.Runtime\w*Facade\b"""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.data\.db\.(AppDatabase|DBManager|DBProvider)\b"""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.data\.db\.entity\."""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.db\.entity\."""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.data\.repository\.Room"""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.data\.update\."""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.common\.utils\.(PrefsReader|HookPrefsReader)\b"""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.common\.utils\.NotificationUtils\b"""),
+        Regex("""\bio\.github\.magisk317\.smscode\.feature\.backup\."""),
+        Regex("""\bio\.github\.magisk317\.smscode\.feature\.store\."""),
+        Regex("""\bRoomSmsCodeRuleRepository\b"""),
+        Regex("""\.dbManager\("""),
+        Regex("""\.appDatabase\("""),
+        Regex("""\.upsertAppInfo\("""),
+        Regex("""\.removeAppInfosByPackage\("""),
+        Regex("""\.queryAllAppInfos"""),
+        Regex("""\bio\.github\.magisk317\.smscode\.data\.db\.entity\.AppInfo\b"""),
+        Regex("""\bio\.github\.magisk317\.smscode\.db\.entity\.SmsCodeRule\b"""),
+    )
+    val recordBannedRegexes = listOf(
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.runtime\.RuntimeStorageFacade\b"""),
+        Regex("""\bRuntimeStorageFacade\.dbManager\("""),
+        Regex("""^\s*import\s+io\.github\.magisk317\.smscode\.runtime\.common\.utils\.JsonUtils\b"""),
+    )
+    val bridgeBannedRegexes = listOf(
+        Regex("""\bDBManager\b"""),
+        Regex("""\bAppDatabase\b"""),
+        Regex("""\bDBProvider\b"""),
+        Regex("""\bRoomSmsCodeRuleRepository\b"""),
+        Regex("""\bRoomAppConfigRepository\b"""),
+        Regex("""\bio\.github\.magisk317\.smscode\.data\.db\.entity\."""),
+        Regex("""\bio\.github\.magisk317\.smscode\.db\.entity\."""),
+    )
+
+    inputs.dir(sourceRoot)
+    inputs.dir(recordSourceRoot)
+    inputs.file(uiBridgeDeclaration)
+
+    doLast {
+        val violations = sourceRoot
+            .asFileTree
+            .matching { include("**/*.kt") }
+            .files
+            .flatMap { source ->
+                source.readLines().mapIndexedNotNull { index, line ->
+                    if (bannedRegexes.any { regex -> regex.containsMatchIn(line) }) {
+                        "${source.relativeTo(projectRoot)}:${index + 1}: ${line.trim()}"
+                    } else {
+                        null
+                    }
+                }
+            } + recordSourceRoot
+            .asFileTree
+            .matching { include("**/*.kt") }
+            .files
+            .flatMap { source ->
+                source.readLines().mapIndexedNotNull { index, line ->
+                    if (recordBannedRegexes.any { regex -> regex.containsMatchIn(line) }) {
+                        "${source.relativeTo(projectRoot)}:${index + 1}: ${line.trim()}"
+                    } else {
+                        null
+                    }
+                }
+            } + listOf(uiBridgeDeclaration.asFile)
+            .filter { it.isFile }
+            .flatMap { source ->
+                source.readLines().mapIndexedNotNull { index, line ->
+                    if (bridgeBannedRegexes.any { regex -> regex.containsMatchIn(line) }) {
+                        "runtime bridge ${source.name}:${index + 1}: ${line.trim()}"
+                    } else {
+                        null
+                    }
+                }
+            }
+
+        if (violations.isNotEmpty()) {
+            error(
+                buildString {
+                    appendLine("Core must not directly depend on runtime storage/update implementation types or runtime feature internals:")
+                    appendLine("Record UI must go through RuntimeCodeRecordFacade for storage and export operations:")
+                    appendLine("The runtime UI bridge must not declare Room implementation or entity types in its signatures:")
+                    violations.forEach { appendLine(it) }
+                },
+            )
+        }
+    }
+}
+
+tasks.named("check").configure {
+    dependsOn(verifyNoRuntimeStorageImplLeak)
+}

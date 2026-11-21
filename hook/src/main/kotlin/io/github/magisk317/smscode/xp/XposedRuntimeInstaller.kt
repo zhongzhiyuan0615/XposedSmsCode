@@ -4,9 +4,14 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import io.github.magisk317.smscode.common.utils.HookPrefsReader
+import io.github.magisk317.smscode.common.utils.ProviderIpcTokenGate
+import io.github.magisk317.smscode.runtime.common.provider.HookFingerprintQuery
 import io.github.magisk317.smscode.common.utils.RuntimeDiagnosticsBridge
 import io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeLogStore
 import io.github.magisk317.smscode.data.db.DBProvider
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
+import io.github.magisk317.smscode.verification.SmsDuplicateCheckResult
+import io.github.magisk317.smscode.verification.resolveSmsDuplicateCheck
 import io.github.magisk317.smscode.data.log.RuntimeLogProvider
 import io.github.magisk317.smscode.runtime.BuildConfig as RuntimeBuildConfig
 import io.github.magisk317.smscode.runtime.RuntimeCodeRecordRestoreFacade
@@ -18,13 +23,15 @@ import io.github.magisk317.smscode.runtime.bridge.HookRuntimeBridge
 import io.github.magisk317.smscode.xp.helper.ModuleConflictArbiter
 import io.github.magisk317.smscode.hook.BuildConfig
 import io.github.magisk317.xposed.logging.DefaultLogSanitizer
-import io.github.magisk317.smscode.xposed.runtime.CoreHookPolicy
-import io.github.magisk317.smscode.xposed.runtime.CoreHookPolicyHolder
-import io.github.magisk317.smscode.xposed.runtime.CoreLogSink
-import io.github.magisk317.smscode.xposed.runtime.CoreLogSinkHolder
-import io.github.magisk317.smscode.xposed.runtime.CoreRuntime
-import io.github.magisk317.smscode.xposed.runtime.CoreRuntimeAccess
+import io.github.magisk317.xposed.logging.MagiskLogPolicy
+import io.github.magisk317.xposed.capability.runtime.CoreHookPolicy
+import io.github.magisk317.xposed.capability.runtime.CoreHookPolicyHolder
+import io.github.magisk317.xposed.capability.runtime.CoreLogSink
+import io.github.magisk317.xposed.capability.runtime.CoreLogSinkHolder
+import io.github.magisk317.xposed.capability.runtime.CoreRuntime
+import io.github.magisk317.xposed.capability.runtime.CoreRuntimeAccess
 import io.github.magisk317.xposed.logging.XposedLogClient
+import io.github.magisk317.xposed.logging.XLog
 
 @SuppressLint("LogNotTimber", "PrivateApi", "StaticFieldLeak")
 object XposedRuntimeInstaller {
@@ -35,12 +42,10 @@ object XposedRuntimeInstaller {
     @Volatile
     private var moduleContext: Context? = null
 
-    @Volatile
-    private var lastSanitizerSyncAt = 0L
-
-    private const val SANITIZER_SYNC_TTL_MS = 3_000L
-
     fun installEntryRuntime() {
+        val logPolicy = MagiskLogPolicy.install(
+            isDiagnosticBuild = BuildConfig.DEBUG || BuildConfig.IS_CI_BUILD,
+        )
         CoreRuntime.install(object : CoreRuntimeAccess {
             override val logTag: String = BuildConfig.LOG_TAG
             override val logLevel: Int = RuntimeBuildConfig.LOG_LEVEL
@@ -54,12 +59,22 @@ object XposedRuntimeInstaller {
                 return ModuleConflictArbiter.shouldSuppressByRelay(context, source)
             }
         })
-        XposedLogClient.configure(
-            authority = RuntimeLogProvider.authority(BuildConfig.APPLICATION_ID),
-            source = "smscode",
-        )
+        if (logPolicy.loggingEnabled) {
+            XposedLogClient.configure(
+                authority = RuntimeLogProvider.authority(BuildConfig.APPLICATION_ID),
+                source = "smscode",
+            )
+        }
+        val hookApp = runCatching {
+            Class.forName("android.app.ActivityThread")
+                .getMethod("currentApplication")
+                .invoke(null) as? android.content.Context
+        }.getOrNull()
+        // The hook process has no local preference file of its own. Installing the snapshot here
+        // (rather than only on the first SMS) gives every preference read a persistent fallback
+        // as soon as one provider hit has been recorded.
+        HookPrefsReader.installSnapshot(hookApp)
         installHookBridge()
-        installLogSink()
     }
 
     /**
@@ -85,6 +100,30 @@ object XposedRuntimeInstaller {
 
                 override fun authority(context: Context): String =
                     DBProvider.authority(context)
+
+                override fun querySmsMsgByFingerprint(
+                    context: Context,
+                    sender: String?,
+                    body: String,
+                    date: Long,
+                ): SmsDuplicateCheckResult {
+                    val token = HookPrefsReader.getIpcToken(context)
+                    if (token.isBlank()) {
+                        XLog.w("SMS dedup token_missing: querying under provider caller policy")
+                    }
+                    return HookFingerprintQuery.query(
+                        context = context,
+                        uri = ProviderIpcTokenGate.attachToken(
+                            DBProvider.smsMsgContentUri(context),
+                            token,
+                        ),
+                        sender = sender,
+                        body = body,
+                        date = date,
+                        msgType = SmsMsg.MSG_TYPE_SMS,
+                        onUnavailable = { failure -> XLog.w(failure.toLogMessage()) },
+                    )
+                }
 
                 override fun claimRuntimeGate(
                     context: Context,
@@ -124,22 +163,26 @@ object XposedRuntimeInstaller {
 
     fun ensureHookProcessLogging(moduleContext: Context) {
         this.moduleContext = moduleContext.applicationContext ?: moduleContext
-        val verbose = HookPrefsReader.isVerboseLogMode(moduleContext)
-        RuntimeDiagnosticsBridge.ensureInstalled()
-        RuntimeLogStore.initialize(this.moduleContext ?: moduleContext, enableDetailedLogs = verbose)
+        val policy = MagiskLogPolicy.current()
+        if (policy.loggingEnabled) {
+            RuntimeDiagnosticsBridge.ensureInstalled()
+            RuntimeLogStore.initialize(
+                this.moduleContext ?: moduleContext,
+                enableDetailedLogs = policy.verboseLogging,
+            )
+            installLogSink()
+        }
         // Cross-process cache invalidation: listen for module-app notifyChange signals.
         io.github.magisk317.smscode.common.utils.HookCacheInvalidator.register(this.moduleContext!!)
-        syncLogSanitizerConfig()
-        installLogSink()
     }
 
     private fun installLogSink() {
+        if (!MagiskLogPolicy.current().loggingEnabled) return
         if (logSinkInstalled) return
         synchronized(this) {
             if (logSinkInstalled) return
             XposedLogClient.attachContext(moduleContext ?: return@synchronized)
             android.util.Log.w("smscode", "installLogSink: installing CoreLogSink, moduleContext=${moduleContext != null}")
-            syncLogSanitizerConfig()
             CoreLogSinkHolder.install(object : CoreLogSink {
                 override fun append(
                     priority: Int,
@@ -150,10 +193,6 @@ object XposedRuntimeInstaller {
                     sensitive: Boolean,
                     throwableText: String?,
                 ) {
-                    // Cheap TTL re-sync so a settings-page toggle reaches this hook
-                    // process within SANITIZER_SYNC_TTL_MS without reading prefs on
-                    // every log line (the old per-line read was the noise source).
-                    maybeResyncLogSanitizerConfig()
                     val safeMessage = if (sensitive) {
                         DefaultLogSanitizer.sanitizeIfEnabled(message)
                     } else {
@@ -164,31 +203,5 @@ object XposedRuntimeInstaller {
             })
             logSinkInstalled = true
         }
-    }
-
-    /**
-     * Apply [LogSanitizerConfig] from prefs. Called at init and on a throttled
-     * schedule from the sink; do not re-read prefs on every log line (hot path
-     * + noisy). See [maybeResyncLogSanitizerConfig].
-     */
-    private fun syncLogSanitizerConfig() {
-        val ctx = moduleContext ?: return
-        val sensitiveDebugEnabled = runCatching {
-            HookPrefsReader.isSensitiveDebugLogMode(ctx)
-        }.getOrNull()
-        io.github.magisk317.xposed.logging.LogSanitizerConfig
-            .syncFromVerboseMode(sensitiveDebugEnabled)
-        lastSanitizerSyncAt = android.os.SystemClock.elapsedRealtime()
-    }
-
-    /**
-     * Re-read the sanitize pref at most once per [SANITIZER_SYNC_TTL_MS] so a
-     * settings-page toggle propagates to hook processes (which have no live pref
-     * listener) within a few seconds, without paying a prefs read per log line.
-     */
-    private fun maybeResyncLogSanitizerConfig() {
-        val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastSanitizerSyncAt < SANITIZER_SYNC_TTL_MS) return
-        syncLogSanitizerConfig()
     }
 }

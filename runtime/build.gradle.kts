@@ -1,14 +1,13 @@
 plugins {
     id("magisk.android.library")
     // The hook process reads preferences from this module, so it must carry the
-    // distribution flavors (smscode.android.common) the app decides with.
-    id("smscode.android.common")
+    // distribution flavors (magisk.android.distribution) the app decides with.
+    id("magisk.android.distribution")
     id(libs.plugins.kotlin.serialization.get().pluginId)
     id(libs.plugins.kotlin.parcelize.get().pluginId)
     id("magisk.android.room")
 }
 val relayDownloadUrl = "https://github.com/magisk3171/xinyi-relay"
-
 
 android {
     namespace = "io.github.magisk317.smscode.runtime"
@@ -31,10 +30,13 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+val magiskIsCiBuild: Boolean = (providers.gradleProperty("isCiBuild").orNull
+    ?: providers.environmentVariable("MAGISK_IS_CI_BUILD").orNull)?.toBooleanStrictOrNull() ?: false
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            buildConfigField("int", "LOG_LEVEL", "5")
+            buildConfigField("int", "LOG_LEVEL", if (magiskIsCiBuild) "2" else "5")
             buildConfigField("boolean", "LOG_TO_XPOSED", "true")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -49,15 +51,24 @@ android {
     // Sources live under src/<name>/kotlin. AGP compiles src/<name>/java by default, so
     // each source set is pointed at the kotlin directory explicitly.
     sourceSets {
-        listOf("main", "test", "github", "fdroid", "play").forEach { name ->
+        listOf("main", "test", "github", "play").forEach { name ->
             findByName(name)?.kotlin?.directories?.add("src/$name/kotlin")
         }
     }
 }
 
 dependencies {
+    implementation(project(":magisk-xposed-kit:runtime"))
+    implementation(project(":magisk-xposed-kit:contract"))
     implementation(project(":magisk-xposed-kit"))
+    implementation(project(":magisk-xposed-kit:capability"))
+    implementation(project(":magisk-xposed-kit:runtime"))
     implementation(project(":magisk-xposed-kit:logging"))
+    // The cloud backup payload source and provider resolver are runtime API
+    // types the app shell composes in DI, so the kit backup modules must stay
+    // visible to consumers of this module.
+    api(project(":magisk-xposed-kit:backup"))
+    api(project(":magisk-xposed-kit:backup-webdav"))
     implementation(project(":smscode-core:contract"))
     implementation(project(":smscode-core:verification"))
     implementation(project(":smscode-core:hook"))
@@ -68,9 +79,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
-    // Networking (needed by GithubUpdateChecker)
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.logging.interceptor)
     // Database (Room)
     implementation(libs.timber)
     testImplementation(libs.junit.jupiter)

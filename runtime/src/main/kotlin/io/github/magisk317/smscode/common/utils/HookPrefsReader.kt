@@ -1,21 +1,19 @@
 package io.github.magisk317.smscode.common.utils
 
+import io.github.magisk317.xposed.logging.MagiskLogPolicy
 import io.github.magisk317.xposed.logging.XLog
 import android.content.Context
 import android.content.SharedPreferences
-import io.github.magisk317.smscode.runtime.BuildConfig
 import io.github.magisk317.smscode.runtime.common.prefs.CodeNotificationOwner
 import io.github.magisk317.smscode.common.constant.PrefConst
-import io.github.magisk317.smscode.db.entity.SmsMsg
+import io.github.magisk317.smscode.data.db.entity.SmsMsg
 import io.github.magisk317.smscode.runtime.bridge.HookPrefsAccess
 import io.github.magisk317.smscode.runtime.contract.prefs.PrefRead
 import io.github.magisk317.smscode.runtime.contract.prefs.PrefReadResult
 import io.github.magisk317.smscode.runtime.contract.prefs.PrefSources
 import io.github.magisk317.smscode.runtime.contract.prefs.PrefsSource
 import io.github.magisk317.smscode.runtime.common.prefs.PrefsResolver
-import io.github.magisk317.smscode.runtime.common.prefs.PrefsSnapshot
-import io.github.magisk317.smscode.runtime.common.prefs.SnapshotPrefsSource
-import io.github.magisk317.smscode.runtime.common.prefs.sharedPrefsSnapshot
+import io.github.magisk317.smscode.runtime.common.prefs.PrefsSnapshotHolder
 import io.github.magisk317.xposed.preferences.PreferenceRead
 import io.github.magisk317.xposed.preferences.PreferenceSource
 import io.github.magisk317.xposed.preferences.SharedPreferencesSource
@@ -31,7 +29,6 @@ import java.util.Collections
 object HookPrefsReader : HookPrefsAccess {
     private const val MISSING_LONG_VALUE = "-9223372036854775808"
     private const val SOURCE_REMOTE_PROVIDER = "provider"
-    private const val SNAPSHOT_PREFS_NAME = "hook_prefs_snapshot"
 
     /**
      * A non-zero cache would be unsafe here: the provider can disappear without a callback when the
@@ -66,11 +63,7 @@ object HookPrefsReader : HookPrefsAccess {
      * app cannot make a switch the user turned off read back as on. Installed from the hosted
      * process context because the module package's own storage is not writable from here.
      */
-    @Volatile
-    private var prefsSnapshot: PrefsSnapshot? = null
-    @Volatile
-    private var snapshotInstalled = false
-    private val fallbackTraceLoggedKeys = Collections.synchronizedSet(mutableSetOf<String>())
+    private val prefsSnapshot = PrefsSnapshotHolder()
 
     @JvmStatic
     fun setRemotePrefsProvider(provider: (() -> SharedPreferences?)?) {
@@ -101,7 +94,7 @@ object HookPrefsReader : HookPrefsAccess {
     }
 
     private fun prefSources(): List<PrefsSource> {
-        val snapshotSource = prefsSnapshot?.let(::SnapshotPrefsSource)
+        val snapshotSource = prefsSnapshot.asSource()
         return if (snapshotSource == null) {
             listOf(remotePrefsSource)
         } else {
@@ -133,39 +126,32 @@ object HookPrefsReader : HookPrefsAccess {
     }
 
     private fun logFallbackOnce(key: String, source: String) {
-        if (fallbackTraceLoggedKeys.add("$key@$source")) {
-            XLog.w(message = "Diag prefs fallback: key=%s source=%s (remote provider unreachable)", key, source)
-        }
+        prefsSnapshot.logFallbackOnce(key, source) { message -> XLog.w(message = message) }
     }
 
     @JvmStatic
     fun installSnapshot(context: Context?) {
-        if (context == null || snapshotInstalled) return
-        runCatching {
-            val target = context.getSharedPreferences(SNAPSHOT_PREFS_NAME, Context.MODE_PRIVATE)
-            prefsSnapshot = sharedPrefsSnapshot(prefs = { target })
-            snapshotInstalled = true
-        }.onFailure { logPrefsSourceError("snapshot install failed", it) }
+        prefsSnapshot.install(context, ::logPrefsSourceError)
     }
 
     private fun resolveBooleanPref(key: String, defaultValue: Boolean): PrefReadResult<Boolean> {
         prefsResolver.invalidate()
         val result = prefsResolver.resolveBoolean(key, defaultValue, prefSources())
-        onResolved(key, result.source) { prefsSnapshot?.recordBoolean(key, result.value) }
+        onResolved(key, result.source) { prefsSnapshot.rememberBoolean(key, result.value) }
         return result
     }
 
     private fun resolveStringPref(key: String, defaultValue: String): PrefReadResult<String> {
         prefsResolver.invalidate()
         val result = prefsResolver.resolveString(key, defaultValue, prefSources())
-        onResolved(key, result.source) { prefsSnapshot?.recordString(key, result.value) }
+        onResolved(key, result.source) { prefsSnapshot.rememberString(key, result.value) }
         return result
     }
 
     private fun resolveIntPref(key: String, defaultValue: Int): PrefReadResult<Int> {
         prefsResolver.invalidate()
         val result = prefsResolver.resolveInt(key, defaultValue, prefSources())
-        onResolved(key, result.source) { prefsSnapshot?.recordInt(key, result.value) }
+        onResolved(key, result.source) { prefsSnapshot.rememberInt(key, result.value) }
         return result
     }
 
@@ -219,14 +205,8 @@ object HookPrefsReader : HookPrefsAccess {
         return getBooleanViaProvider(PrefConst.KEY_ENABLE, defaultValue)
     }
 
-    override fun isVerboseLogMode(context: Context): Boolean {
-        val defaultValue = false
-        return getBooleanViaProvider(PrefConst.KEY_VERBOSE_LOG_MODE, defaultValue)
-    }
-
-    override fun isSensitiveDebugLogMode(context: Context): Boolean {
-        return getBooleanViaProvider(PrefConst.KEY_SENSITIVE_DEBUG_LOG_MODE, false)
-    }
+    override fun isVerboseLogMode(context: Context): Boolean =
+        MagiskLogPolicy.current().verboseLogging
 
     override fun autoInputCodeEnabled(context: Context): Boolean {
         val defaultValue = true

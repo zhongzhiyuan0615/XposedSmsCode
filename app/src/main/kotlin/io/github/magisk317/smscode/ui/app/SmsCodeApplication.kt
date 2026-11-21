@@ -1,30 +1,32 @@
 package io.github.magisk317.smscode.ui.app
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
-import android.os.Build
+import android.os.Bundle
 import io.github.magisk317.smscode.runtime.BuildConfig as RuntimeBuildConfig
 import com.github.tianma8023.xposed.smscode.BuildConfig
 import io.github.magisk317.smscode.common.constant.PrefConst
-import io.github.magisk317.smscode.runtime.common.diagnostics.ActivationDiagnosticsStore
+import io.github.magisk317.xposed.runtime.state.RuntimeStateStore
 import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
 import io.github.magisk317.smscode.common.utils.XscPreferenceHooks
 import io.github.magisk317.smscode.common.utils.HookPreferenceMirror
-import io.github.magisk317.smscode.xposed.utils.ModuleActivationStore
-import io.github.magisk317.smscode.xposed.utils.ModuleUtils
+import io.github.magisk317.xposed.capability.utils.ModuleActivationStore
 import io.github.magisk317.smscode.common.utils.RuntimeDiagnosticsBridge
+import io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeCrashLogs
 import io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeLogStore
 import io.github.magisk317.smscode.xp.helper.ModuleConflictArbiter
-import io.github.magisk317.smscode.xposed.runtime.CoreHookPolicy
-import io.github.magisk317.smscode.xposed.runtime.CoreHookPolicyHolder
-import io.github.magisk317.smscode.xposed.runtime.CoreLogSink
-import io.github.magisk317.smscode.xposed.runtime.CoreLogSinkHolder
-import io.github.magisk317.smscode.xposed.runtime.CoreRuntime
+import io.github.magisk317.xposed.capability.runtime.CoreHookPolicy
+import io.github.magisk317.xposed.capability.runtime.CoreHookPolicyHolder
+import io.github.magisk317.xposed.capability.runtime.CoreLogSink
+import io.github.magisk317.xposed.capability.runtime.CoreLogSinkHolder
+import io.github.magisk317.xposed.capability.runtime.CoreRuntime
 import io.github.magisk317.smscode.runtime.common.utils.StorageUtils
-import io.github.magisk317.smscode.xposed.runtime.CoreRuntimeAccess
+import io.github.magisk317.xposed.capability.runtime.CoreRuntimeAccess
 import io.github.magisk317.xposed.logging.XLog
+import io.github.magisk317.xposed.logging.MagiskLogPolicy
 import io.github.magisk317.xposed.logging.DefaultLogSanitizer
 import io.github.magisk317.smscode.di.appModule
 import io.github.magisk317.smscode.di.billingModule
@@ -48,18 +50,30 @@ class SmsCodeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Before anything logs or crashes: the policy decides both redaction and how much a
+        // bundle collects, and the crash writer has to be in place to catch the rest of startup.
+        val logPolicy = MagiskLogPolicy.install(
+            // -PminifyDebug makes the debug variant non-debuggable, which clears
+            // BuildConfig.DEBUG; the build type still identifies the capture channel.
+            isDiagnosticBuild = BuildConfig.DEBUG || BuildConfig.IS_CI_BUILD,
+        )
+        RuntimeCrashLogs.install(this)
         AppPreferencesDataStore.install(XscPreferenceHooks)
-        android.util.Log.w("smscode", "SmsCodeApplication.onCreate() START")
+        if (logPolicy.loggingEnabled) {
+            android.util.Log.w("smscode", "SmsCodeApplication.onCreate() START")
+        }
         ensureIpcToken()
         RuntimeDiagnosticsBridge.ensureInstalled()
-        RuntimeLogStore.initialize(this, enableDetailedLogs = false)
+        if (logPolicy.loggingEnabled) {
+            RuntimeLogStore.initialize(this, enableDetailedLogs = false)
+        }
         installCoreRuntime()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
 
         startKoin {
-            androidLogger()
+            if (MagiskLogPolicy.current().loggingEnabled) androidLogger()
             androidContext(this@SmsCodeApplication)
             modules(appModule, billingModule, uiModule)
         }
@@ -71,10 +85,8 @@ class SmsCodeApplication : Application() {
         initXposedServiceActivationMonitor()
         importPendingCodeRecords()
         syncPreferences()
-
+        registerLicenseActivityKiller()
     }
-
-
 
     private fun importPendingCodeRecords() {
         applicationScope.launch {
@@ -85,20 +97,8 @@ class SmsCodeApplication : Application() {
     private fun syncPreferences() {
         applicationScope.launch {
             HookPreferenceMirror.publish(this@SmsCodeApplication)
-            val verboseLog = AppPreferencesDataStore.getBoolean(
-                this@SmsCodeApplication,
-                PrefConst.KEY_VERBOSE_LOG_MODE,
-                false,
-            )
             RuntimeDiagnosticsBridge.ensureInstalled()
-            RuntimeLogStore.setEnabled(verboseLog)
-            val sensitiveDebugMode = AppPreferencesDataStore.getBoolean(
-                this@SmsCodeApplication,
-                PrefConst.KEY_SENSITIVE_DEBUG_LOG_MODE,
-                false,
-            )
-            io.github.magisk317.xposed.logging.LogSanitizerConfig
-                .syncFromVerboseMode(sensitiveDebugMode)
+            RuntimeLogStore.setEnabled(MagiskLogPolicy.current().verboseLogging)
             StorageUtils.ensureExternalAppDataPermissions(this@SmsCodeApplication)
         }
     }
@@ -116,28 +116,27 @@ class SmsCodeApplication : Application() {
             override val applicationId: String = BuildConfig.APPLICATION_ID
             override val actionNamespace: String = "io.github.magisk317.smscode"
         })
-        CoreLogSinkHolder.install(object : CoreLogSink {
-            override fun append(
-                priority: Int,
-                tag: String,
-                message: String,
-                force: Boolean,
-                route: String?,
-                sensitive: Boolean,
-                throwableText: String?,
-            ) {
-                // sensitive=true means payload may contain secrets; honor shared switch
-                // Opening pref_sensitive_debug_log_mode disables sanitization and lets
-                // plaintext through for debugging.
-                val safeMessage = if (sensitive) {
-                    DefaultLogSanitizer.sanitizeIfEnabled(message)
-                } else {
-                    message
+        if (MagiskLogPolicy.current().loggingEnabled) {
+            CoreLogSinkHolder.install(object : CoreLogSink {
+                override fun append(
+                    priority: Int,
+                    tag: String,
+                    message: String,
+                    force: Boolean,
+                    route: String?,
+                    sensitive: Boolean,
+                    throwableText: String?,
+                ) {
+                    val safeMessage = if (sensitive) {
+                        DefaultLogSanitizer.sanitizeIfEnabled(message)
+                    } else {
+                        message
+                    }
+                    RuntimeDiagnosticsBridge.ensureInstalled()
+                    RuntimeLogStore.append(priority, tag, safeMessage, force, route, throwableText)
                 }
-                RuntimeDiagnosticsBridge.ensureInstalled()
-                RuntimeLogStore.append(priority, tag, safeMessage, force, route, throwableText)
-            }
-        })
+            })
+        }
         CoreHookPolicyHolder.install(object : CoreHookPolicy {
             override fun shouldSuppressSystemHooks(context: Context?, source: String): Boolean {
                 return ModuleConflictArbiter.shouldSuppressByRelay(context, source)
@@ -163,9 +162,9 @@ class SmsCodeApplication : Application() {
                 HookPreferenceMirror.publish(this@SmsCodeApplication)
             }
         }
-        ModuleUtils.setRuntimeActivated(true)
+        RuntimeStateStore.setRuntimeConnected(true)
         ModuleActivationStore.markActivated(this)
-        ActivationDiagnosticsStore.recordServiceBind(
+        RuntimeStateStore.recordServiceBind(
             context = this,
             frameworkName = frameworkName ?: "unknown",
             frameworkVersion = frameworkVersion ?: "unknown",
@@ -180,8 +179,8 @@ class SmsCodeApplication : Application() {
 
     internal fun handleXposedServiceDied() {
         AppPreferencesDataStore.setRemotePrefsProvider(null)
-        ModuleUtils.setRuntimeActivated(false)
-        ActivationDiagnosticsStore.recordServiceDied(
+        RuntimeStateStore.setRuntimeConnected(false)
+        RuntimeStateStore.recordServiceDied(
             context = this,
             verboseLogging = readVerboseLogMode(),
         )
@@ -192,8 +191,26 @@ class SmsCodeApplication : Application() {
         XLog.w(message = "Failed to register Xposed service listener: %s", throwable.message ?: "unknown")
     }
 
-    private fun readVerboseLogMode(): Boolean = runBlocking(Dispatchers.IO) {
-        AppPreferencesDataStore.getBoolean(this@SmsCodeApplication, PrefConst.KEY_VERBOSE_LOG_MODE, false)
+    private fun readVerboseLogMode(): Boolean = MagiskLogPolicy.current().verboseLogging
+
+    private fun registerLicenseActivityKiller() {
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {
+                if (activity.javaClass.name == "com.pairip.licensecheck.LicenseActivity") {
+                    runCatching {
+                        Timber.w("Detected com.pairip.licensecheck.LicenseActivity. Finishing it to prevent gray screen.")
+                        activity.finish()
+                    }
+                        .onFailure { Timber.e(it, "Failed to finish LicenseActivity") }
+                }
+            }
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
     }
 
     private fun ensureIpcToken() {

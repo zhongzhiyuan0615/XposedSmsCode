@@ -1,0 +1,26 @@
+package io.github.magisk317.smscode.ui.home
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import io.github.magisk317.uikit.R as UiKitR
+import io.github.magisk317.uikit.surface.PageScaffoldMiuix
+
+/** Miuix settings surface using the shared secondary-page scaffold contract. */
+@Composable
+internal fun ComposeSettingsScreenMiuix(
+    viewModel: SettingsViewModel? = null,
+    refreshTrigger: Int = 0,
+    onExit: () -> Unit = {},
+) {
+    PageScaffoldMiuix(
+        title = stringResource(UiKitR.string.pref_general_title),
+    ) { listPadding, scrollModifier ->
+        ComposeSettingsScreenBody(
+            viewModel = viewModel,
+            refreshTrigger = refreshTrigger,
+            onExit = onExit,
+            listPadding = listPadding,
+            scrollModifier = scrollModifier,
+        )
+    }
+}

@@ -1,11 +1,8 @@
 package io.github.magisk317.smscode.common.constant
 
-enum class PrefValueType {
-    BOOLEAN,
-    INT,
-    FLOAT,
-    STRING,
-}
+import io.github.magisk317.smscode.runtime.common.prefs.prefValueTypeOf
+
+typealias PrefValueType = io.github.magisk317.smscode.runtime.common.prefs.PrefValueType
 
 object PrefRestoreTypeRegistry {
     val BOOLEAN_KEYS: Set<String> = setOf(
@@ -31,9 +28,9 @@ object PrefRestoreTypeRegistry {
         PrefConst.KEY_MARK_AS_READ,
         PrefConst.KEY_DELETE_SMS,
         PrefConst.KEY_KILL_ME,
-        PrefConst.KEY_VERBOSE_LOG_MODE,
         PrefConst.KEY_AUTO_UPDATE_ON_START,
         PrefConst.KEY_AUTO_UPDATE_WIFI_ONLY,
+        PrefConst.KEY_TRACK_CI_BUILDS,
         PrefConst.KEY_PRIVACY_POLICY_ACCEPTED,
         PrefConst.KEY_BACKUP_COMPAT_TIP_SHOWN,
     )
@@ -47,12 +44,6 @@ object PrefRestoreTypeRegistry {
 
     val FLOAT_KEYS: Set<String> = emptySet()
 
-    fun typeOf(key: String): PrefValueType {
-        return when {
-            BOOLEAN_KEYS.contains(key) -> PrefValueType.BOOLEAN
-            INT_KEYS.contains(key) -> PrefValueType.INT
-            FLOAT_KEYS.contains(key) -> PrefValueType.FLOAT
-            else -> PrefValueType.STRING
-        }
-    }
+    fun typeOf(key: String): PrefValueType =
+        prefValueTypeOf(key, BOOLEAN_KEYS, INT_KEYS, FLOAT_KEYS)
 }

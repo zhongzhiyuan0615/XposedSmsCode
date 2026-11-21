@@ -7,9 +7,9 @@ javaBytecode = "27"
 buildTools = "37.0.0"
 cmake = "4.1.2"
 ndk = "30.0.16248370"
-kotlin = "2.5.0-Beta1"
-ksp = "2.3.12"
-kotlinx-serialization = "1.11.0"
+kotlin = "2.5.0-RC"
+ksp = "2.3.14"
+kotlinx-serialization = "1.13.0"
 coroutines = "1.11.0"
 kotlinx-collections-immutable = "0.5.2"
 kotlinx-datetime = "0.8.0-0.6.x-compat"
@@ -20,32 +20,30 @@ androidx-browser = "1.10.0"
 androidx-core-ktx = "1.19.1"
 androidx-credentials-version = "1.6.0"
 collection = "1.7.0"
-datastore = "1.3.0-rc01"
+datastore = "1.3.0"
 documentfile = "1.1.0"
-lifecycle = "2.11.0"
+lifecycle = "2.11.1"
 navigation = "2.10.2"
 room = "2.8.5"
 sqlite = "2.7.1"
 startup = "1.2.0"
 work = "2.12.0"
-compose-bom-alpha = "2026.10.00"
-agp = "9.5.0-alpha09"
+compose-bom-alpha = "2026.11.01"
+agp = "9.5.1"
 detekt = "2.0.0-alpha.6"
 kover = "0.9.11"
 junit-jupiter = "6.1.3"
 junit-platform = "6.1.3"
-mockk = "1.14.11"
-kotest = "6.2.6"
+mockk = "1.14.12"
+kotest = "6.2.7"
 androidx-test-core = "1.7.0"
 androidx-test-ext-junit = "1.3.0"
 androidx-test-runner = "1.7.0"
-androidx-test-uiautomator = "2.4.0"
+androidx-test-uiautomator = "2.4.1"
 benchmark = "1.5.0"
-okhttp = "5.5.0"
+okhttp = "5.5.1"
 retrofit = "3.0.0"
 paho-mqtt = "1.2.5"
-firebase-bom = "35.0.1"
-google-services = "4.5.0"
 coil3 = "3.6.3"
 koin = "4.2.2"
 miuix = "0.9.4"
@@ -53,7 +51,7 @@ billing = "9.1.0"
 kermit = "2.2.0"
 timber = "5.0.1"
 jakarta-mail = "2.0.2"
-conscrypt = "2.7.0"
+conscrypt = "2.9.0"
 asm = "9.10.1"
 libxposed-api = "102.0.0"
 libxposed-service = "102.0.0"
@@ -64,14 +62,13 @@ play-services-code-scanner = "16.1.0"
 hiddenapibypass = "6.2"
 hyperisland-kit = "0.4.5"
 libsu = "6.0.0"
-markdown = "0.7.17"
-metrics-performance = "1.0.0"
+markdown = "0.7.18"
 miuix-blur = "0.9.4"
 material-kolor = "5.0.1"
-versionCode = "135"
-versionName = "3.3.11"
+versionCode = "139"
+versionName = "3.4.5"
 
-version-catalog-update = "1.1.1"
+version-catalog-update = "1.1.2"
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidx-annotation" }
@@ -106,7 +103,6 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 androidx-material = { module = "androidx.compose.material:material" }
 androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
-androidx-metrics-performance = { module = "androidx.metrics:metrics-performance", version.ref = "metrics-performance" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
@@ -124,9 +120,6 @@ coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3
 coil3-core = { module = "io.coil-kt.coil3:coil", version.ref = "coil3" }
 conscrypt-openjdk-uber = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "conscrypt" }
 detekt-rules-ktlint = { module = "dev.detekt:detekt-rules-ktlint-wrapper", version.ref = "detekt" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
-firebase-auth = { module = "com.google.firebase:firebase-auth" }
-firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
 hyperisland-kit = { module = "io.github.d4viddf:hyperisland_kit", version.ref = "hyperisland-kit" }
 jakarta-mail = { module = "com.sun.mail:jakarta.mail", version.ref = "jakarta-mail" }
@@ -157,7 +150,7 @@ okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 okhttp-tls = { module = "com.squareup.okhttp3:okhttp-tls", version.ref = "okhttp" }
-palette = { module = "androidx.palette:palette", version = "1.0.0" }
+palette = { module = "androidx.palette:palette", version = "1.1.0" }
 paho-mqtt = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "paho-mqtt" }
 play-app-update = { module = "com.google.android.play:app-update", version.ref = "play-app-update" }
 play-feature-delivery = { module = "com.google.android.play:feature-delivery", version.ref = "play-feature-delivery" }
@@ -174,7 +167,6 @@ android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "a
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-test = { id = "com.android.test", version.ref = "agp" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
-google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

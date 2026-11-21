@@ -10,11 +10,10 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
-        gradlePluginPortal()
         maven("https://jitpack.io") {
             name = "JitPack"
             content {
@@ -28,22 +27,29 @@ include(
     ":app",
     ":hook",
     ":runtime",
-    ":core",
+    ":presentation",
     ":smscode-core:hook",
     ":smscode-core:domain",
     ":smscode-core:runtime",
     ":smscode-core:contract",
     ":smscode-core:rule",
     ":smscode-core:verification",
+    ":smscode-core:verification-runtime",
     ":smscode-core:db",
     ":magisk-ui-kit",
     ":magisk-ui-kit:billing",
-    ":magisk-ui-kit:update",
+    ":magisk-ui-kit:governance",
+    ":magisk-ui-kit:backup",
     ":magisk-xposed-kit",
+    ":magisk-xposed-kit:contract",
     ":magisk-xposed-kit:logging",
-    ":magisk-xposed-kit:logging-core",
     ":magisk-xposed-kit:diagnostics",
+    ":magisk-xposed-kit:capability",
+    ":magisk-xposed-kit:runtime",
     ":magisk-xposed-kit:permission",
+    ":magisk-xposed-kit:service",
+    ":magisk-xposed-kit:backup",
+    ":magisk-xposed-kit:backup-webdav",
 )
 
 project(":smscode-core:hook").projectDir = file("smscode/core/hook")
@@ -52,11 +58,18 @@ project(":smscode-core:runtime").projectDir = file("smscode/core/runtime")
 project(":smscode-core:contract").projectDir = file("smscode/core/contract")
 project(":smscode-core:rule").projectDir = file("smscode/core/rule")
 project(":smscode-core:verification").projectDir = file("smscode/core/verification")
+project(":smscode-core:verification-runtime").projectDir = file("smscode/core/verification-runtime")
 project(":smscode-core:db").projectDir = file("smscode/core/db")
 project(":smscode-core").projectDir = file("smscode/core")
+project(":magisk-xposed-kit:contract").projectDir = file("magisk-xposed-kit/contract")
 project(":magisk-xposed-kit:logging").projectDir = file("magisk-xposed-kit/logging")
-project(":magisk-xposed-kit:logging-core").projectDir = file("magisk-xposed-kit/logging-core")
 project(":magisk-xposed-kit:diagnostics").projectDir = file("magisk-xposed-kit/diagnostics")
+project(":magisk-xposed-kit:capability").projectDir = file("magisk-xposed-kit/capability")
+project(":magisk-xposed-kit:runtime").projectDir = file("magisk-xposed-kit/runtime")
 project(":magisk-xposed-kit:permission").projectDir = file("magisk-xposed-kit/permission")
+project(":magisk-xposed-kit:service").projectDir = file("magisk-xposed-kit/service")
+project(":magisk-xposed-kit:backup").projectDir = file("magisk-xposed-kit/backup")
+project(":magisk-xposed-kit:backup-webdav").projectDir = file("magisk-xposed-kit/backup-webdav")
 project(":magisk-ui-kit:billing").projectDir = file("magisk-ui-kit/billing")
-project(":magisk-ui-kit:update").projectDir = file("magisk-ui-kit/update")
+project(":magisk-ui-kit:governance").projectDir = file("magisk-ui-kit/governance")
+project(":magisk-ui-kit:backup").projectDir = file("magisk-ui-kit/backup")

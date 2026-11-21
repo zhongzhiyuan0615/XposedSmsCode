@@ -1,13 +1,19 @@
 plugins {
     id("magisk.android.library")
     // Carries the distribution flavors so the app's flavor selects this module's
-    // variant and, through it, :runtime's.
-    id("smscode.android.common")
+    // variant and, through it, :runtime's. Without the dimension the strategy
+    // below would pin :runtime to its github variant even in a play build.
+    id("magisk.android.distribution")
     id("kotlin-parcelize")
 }
 
-val appVersionName = libs.versions.versionName.get()
-val appVersionCode = libs.versions.versionCode.get().toInt()
+val appVersionName = rootProject.providers.gradleProperty("versionName")
+    .orElse(libs.versions.versionName)
+    .get()
+val appVersionCode = rootProject.providers.gradleProperty("versionCode")
+    .map { requireNotNull(it.toIntOrNull()) { "Invalid -PversionCode=$it" } }
+    .orElse(libs.versions.versionCode.map { it.toInt() })
+    .get()
 
 android {
     namespace = "io.github.magisk317.smscode.hook"
@@ -27,23 +33,30 @@ android {
     // Sources live under src/<name>/kotlin. AGP compiles src/<name>/java by default, so
     // each source set is pointed at the kotlin directory explicitly.
     sourceSets {
-        listOf("main", "test", "github", "fdroid", "play").forEach { name ->
+        listOf("main", "test", "github", "play").forEach { name ->
             findByName(name)?.kotlin?.directories?.add("src/$name/kotlin")
         }
     }
 }
 
 dependencies {
+    implementation(project(":magisk-xposed-kit:runtime"))
+    implementation(project(":magisk-xposed-kit:contract"))
     implementation(project(":runtime"))
     implementation(project(":smscode-core:hook"))
     implementation(project(":smscode-core:domain"))
     implementation(project(":smscode-core:rule"))
     implementation(project(":smscode-core:contract"))
     implementation(project(":smscode-core:runtime"))
+    implementation(project(":smscode-core:verification-runtime"))
     implementation(project(":smscode-core:db"))
     implementation(project(":smscode-core:verification"))
     implementation(project(":magisk-xposed-kit"))
+    implementation(project(":magisk-xposed-kit:capability"))
+    implementation(project(":magisk-xposed-kit:runtime"))
     implementation(project(":magisk-xposed-kit:logging"))
     implementation(libs.androidx.core.ktx)
     compileOnly(libs.libxposed.api)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
