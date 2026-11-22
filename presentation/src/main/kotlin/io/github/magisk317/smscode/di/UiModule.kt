@@ -1,7 +1,6 @@
 package io.github.magisk317.smscode.di
 
 import io.github.magisk317.smscode.presentation.BuildConfig
-import io.github.magisk317.smscode.security.CiUpdateGateVault
 import io.github.magisk317.smscode.ui.home.AppConfigViewModel
 import io.github.magisk317.smscode.ui.home.CloudBackupViewModel
 import io.github.magisk317.smscode.ui.home.SettingsViewModel
@@ -67,9 +66,6 @@ val uiModule = module {
             checker = checker,
             downloader = downloader,
             fileProviderAuthority = "${context.packageName}.files",
-            // 进入安装流程前封存当前激活：升级是唯一一个新版本可能自己激活不回来的时刻，
-            // 这个风险与构建形态无关，所以不再按 CI/Release 分支。
-            onBackupBeforeInstall = { CiUpdateGateVault.backup(context) },
             // 规则在 kit，值在本仓：未设置即 kit 默认（开/不限 Wi-Fi），商店包整条通道交给商店。
             startupCheckFacts = {
                 val onStart = AppPreferencesDataStore.getBoolean(

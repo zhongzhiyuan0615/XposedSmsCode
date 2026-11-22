@@ -18,8 +18,8 @@ object XscBugleReadStateHost : MiuiBugleReadStateHost {
     override fun isModuleEnabled(context: Context): Boolean =
         HookRuntimeBridge.prefsAccess.isEnabled(context)
 
-    override fun isMobileAutomationAllowed(context: Context): Boolean =
-        HookRuntimeBridge.prefsAccess.mobileAutomationAllowed(context)
+    // Fork: the entitlement gate is removed; automation is always allowed.
+    override fun isMobileAutomationAllowed(context: Context): Boolean = true
 
     override fun isMarkAsReadEnabled(context: Context): Boolean =
         HookRuntimeBridge.prefsAccess.markAsReadEnabled(context)

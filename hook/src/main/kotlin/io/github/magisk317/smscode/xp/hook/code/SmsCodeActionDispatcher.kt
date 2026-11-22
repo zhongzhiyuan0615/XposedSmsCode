@@ -15,13 +15,14 @@ import io.github.magisk317.smscode.runtime.verification.HostSmsCodeActionWiring
 import io.github.magisk317.smscode.runtime.verification.NotificationDispatchGuard
 import io.github.magisk317.smscode.runtime.verification.SmsCodePostParseCoordinator
 import io.github.magisk317.smscode.runtime.verification.SmsCodeActionDispatcher as SharedSmsCodeActionDispatcher
-import io.github.magisk317.xposed.logging.XLog
 import java.util.concurrent.ScheduledExecutorService
 
 object SmsCodeActionDispatcher {
 
     private val wiring: HostSmsCodeActionWiring<VerificationSmsMsg> = HostSmsCodeActionWiring<VerificationSmsMsg>(
-        mobileAutomationAllowed = ::mobileAutomationAllowed,
+        // The activation gate is gone; the shared wiring keeps the parameter for
+        // its host contract, so automation is always allowed.
+        mobileAutomationAllowed = { true },
         claimAutoInputDispatch = { context, msg, delayMs -> claimAutoInputDispatch(context, msg.raw, delayMs) },
         claimNotificationDispatch = { context, msg -> claimNotificationDispatch(context, msg.raw) },
         newCopyAction = { plugin, phone, msg, enabled ->
@@ -166,10 +167,6 @@ object SmsCodeActionDispatcher {
         smsMsg: SmsMsg,
         delayMs: Long,
     ): Boolean {
-        if (!mobileAutomationAllowed(pluginContext)) {
-            XLog.i(message = "Mobile entitlement gate skipped auto-input dispatch")
-            return false
-        }
         return AutoInputDispatchGuard.claim(
             pluginContext = pluginContext,
             smsMsg = smsMsg.toVerificationMessage(),
@@ -208,10 +205,6 @@ object SmsCodeActionDispatcher {
             }
         }
     }
-
-    private fun mobileAutomationAllowed(context: Context): Boolean = runCatching {
-        HookRuntimeBridge.prefsAccess.mobileAutomationAllowed(context)
-    }.getOrDefault(false)
 
     private fun io.github.magisk317.smscode.runtime.bridge.HookRuntimeGateClaimResult.toAutoInputClaim(): AutoInputDispatchGuard.ClaimResult {
         return AutoInputDispatchGuard.ClaimResult(

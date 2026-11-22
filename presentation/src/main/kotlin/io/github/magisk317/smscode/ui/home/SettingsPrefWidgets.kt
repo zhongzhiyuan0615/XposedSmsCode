@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.magisk317.smscode.presentation.BuildConfig
-import io.github.magisk317.xposed.logging.MagiskOtel
 import io.github.magisk317.xposed.diagnostics.DiagnosticBundleNames
 import io.github.magisk317.smscode.presentation.R
 import io.github.magisk317.uikit.R as UiKitR

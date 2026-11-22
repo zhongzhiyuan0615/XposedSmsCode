@@ -3,7 +3,6 @@ package io.github.magisk317.smscode.xp
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import io.github.magisk317.smscode.common.utils.HookPrefsReader
 import io.github.magisk317.smscode.common.utils.ProviderIpcTokenGate
 import io.github.magisk317.smscode.runtime.common.provider.HookFingerprintQuery
@@ -25,8 +24,6 @@ import io.github.magisk317.smscode.xp.helper.ModuleConflictArbiter
 import io.github.magisk317.smscode.hook.BuildConfig
 import io.github.magisk317.xposed.logging.DefaultLogSanitizer
 import io.github.magisk317.xposed.logging.MagiskLogPolicy
-import io.github.magisk317.xposed.logging.MagiskOtel
-import io.github.magisk317.xposed.logging.AnonymousInstallationId
 import io.github.magisk317.xposed.capability.runtime.CoreHookPolicy
 import io.github.magisk317.xposed.capability.runtime.CoreHookPolicyHolder
 import io.github.magisk317.xposed.capability.runtime.CoreLogSink
@@ -73,49 +70,10 @@ object XposedRuntimeInstaller {
                 .getMethod("currentApplication")
                 .invoke(null) as? android.content.Context
         }.getOrNull()
-        val otelEnabled = if (hookApp != null) {
-            BuildConfig.DEBUG || BuildConfig.IS_CI_BUILD || HookPrefsReader.isAnalyticsEnabled(hookApp)
-        } else {
-            true
-        }
         // The hook process has no local preference file of its own. Installing the snapshot here
         // (rather than only on the first SMS) gives every preference read a persistent fallback
         // as soon as one provider hit has been recorded.
         HookPrefsReader.installSnapshot(hookApp)
-        MagiskOtel.configureIfAbsent(
-            MagiskOtel.Config(
-                enabled = otelEnabled,
-                serviceName = "xposedsmscode",
-                serviceVersion = BuildConfig.VERSION_NAME,
-                projectId = "83955172",
-                projectName = "XposedSmsCode",
-                environment = if (BuildConfig.DEBUG) "debug" else if (BuildConfig.IS_CI_BUILD) "ci" else "release",
-                // Captured once here, but the provider below is what actually keeps the value
-                // alive: at hook-install time the remote prefs provider is often not bound yet,
-                // and freezing "" here used to drop service.instance.id for the whole process
-                // (v3.3.10 measured 0% coverage while commit/device attributes stayed at 100%).
-                serviceInstanceId = HookPrefsReader.getStringPreference(
-                    AnonymousInstallationId.PREFERENCE_KEY,
-                    "",
-                ),
-                serviceInstanceIdProvider = {
-                    HookPrefsReader.getStringPreference(AnonymousInstallationId.PREFERENCE_KEY, "")
-                },
-                serviceCommit = BuildConfig.COMMIT_HASH,
-                deviceAttributes =
-                    mapOf(
-                        "device.manufacturer" to Build.MANUFACTURER,
-                        "device.model" to Build.MODEL,
-                        "os.name" to "android",
-                        "os.version" to Build.VERSION.RELEASE,
-                        "os.api_level" to Build.VERSION.SDK_INT.toString(),
-                        // Lets the cloud side split play from sideload installs,
-                        // which share version and commit.
-                        "distribution.channel" to BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
-                    ),
-                suppressedResultValues = setOf("skip"),
-            ),
-        )
         installHookBridge()
     }
 

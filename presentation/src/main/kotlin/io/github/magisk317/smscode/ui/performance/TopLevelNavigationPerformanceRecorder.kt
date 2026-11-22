@@ -70,30 +70,8 @@ data class NavigationTransitionResult(
     val cancellationReason: NavigationCancellationReason? = null,
 ) {
     /**
-     * Fixed, privacy-safe attributes for the app shell's telemetry adapter.
-     *
-     * Monotonic timestamps and deep-link values are intentionally absent. [NavigationTransitionToken]
-     * already guarantees that source and target are parameter-free route IDs.
+     * A bounded, single-line representation suitable for local logs.
      */
-    fun toTelemetryAttributes(): Map<String, String> = buildMap {
-        put("token", token.id)
-        put("source_page", token.source)
-        put("target_page", token.target)
-        put("input_kind", token.input.logName())
-        put("result", status.logName())
-        put("process", "app")
-        put("stage", "top_level_transition")
-        put("cache_hit", cacheHit.toString())
-        put("missing_milestones", missingMilestones.joinToString(separator = ",") { it.logName() })
-        durations.totalMillis?.let { put("duration_ms", it.toString()) }
-        durations.firstFrameMillis?.let { put("first_frame_ms", it.toString()) }
-        durations.settledMillis?.let { put("settled_ms", it.toString()) }
-        durations.dataReadyMillis?.let { put("data_ready_ms", it.toString()) }
-        durations.cacheHitMillis?.let { put("cache_hit_ms", it.toString()) }
-        cancellationReason?.let { put("cancellation_reason", it.logName()) }
-    }
-
-    /** A bounded, single-line representation suitable for local logs or an OTEL adapter. */
     fun toLogLine(): String = buildString {
         append("ui.navigation")
         append(" token=").append(token.id)

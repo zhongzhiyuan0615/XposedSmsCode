@@ -117,11 +117,8 @@ internal fun OverviewScreenMiuix(
                 ) {
                     StatusCard(
                         isEnabled = state.activationStatus.isEnabled,
-                        isEntitled = state.mobileAutomationAllowed,
-                        showEntitlement = state.showEntitlement,
                         showDiagnostics = state.showStatusDiagnostics,
                         diagnostics = state.statusDiagnostics,
-                        onActivateClick = actions.onActivateClick,
                         onDiagnosticsToggle = actions.onToggleDiagnostics,
                     )
 

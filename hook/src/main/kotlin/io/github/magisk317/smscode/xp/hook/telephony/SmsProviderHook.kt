@@ -28,9 +28,9 @@ private object XscSmsProviderHookHost : SmsProviderHookHost {
     ): SmsProviderWriteDecision = SmsProviderBlacklistEngine.evaluate(
         match = { sender, body -> SmsBlacklistUtils.match(pluginContext, sender, body) },
         enabled = runCatching { HookRuntimeBridge.prefsAccess.isEnabled(pluginContext) }.getOrDefault(false),
-        entitlementAllowed = runCatching {
-            HookRuntimeBridge.prefsAccess.mobileAutomationAllowed(pluginContext)
-        }.getOrDefault(false),
+        // The activation gate is gone; the shared engine keeps the parameter for
+        // its host contract, so entitlement checks always pass.
+        entitlementAllowed = true,
         conflictSuppressed = runCatching {
             ModuleConflictArbiter.shouldSuppressByRelay(phoneContext, "XscSmsProviderHookHost")
         }.getOrDefault(false),

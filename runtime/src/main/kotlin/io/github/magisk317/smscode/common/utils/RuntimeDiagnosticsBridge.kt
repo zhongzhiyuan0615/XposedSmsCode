@@ -8,8 +8,6 @@ import io.github.magisk317.smscode.runtime.common.diagnostics.LogRetentionConfig
 import io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeDiagnosticsConfig
 import io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeDiagnosticsInstaller
 import io.github.magisk317.xposed.logging.MagiskLogPolicy
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 
 object RuntimeDiagnosticsBridge {
     private const val PRODUCT = "smscode"
@@ -21,7 +19,6 @@ object RuntimeDiagnosticsBridge {
                 logTag = BuildConfig.LOG_TAG,
                 // One token names the bundle, the staging directory and the export directory.
                 product = PRODUCT,
-                distributionChannel = BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
                 commitHash = BuildConfig.COMMIT_HASH,
                 logRetentionDaysProvider = ::readConfiguredLogRetentionDays,
                 routeResolver = { io.github.magisk317.smscode.runtime.common.diagnostics.RuntimeLogStore.ROUTE_APP },

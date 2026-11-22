@@ -6,13 +6,11 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.os.Build
 import io.github.magisk317.smscode.runtime.BuildConfig as RuntimeBuildConfig
 import com.github.tianma8023.xposed.smscode.BuildConfig
 import io.github.magisk317.smscode.common.constant.PrefConst
 import io.github.magisk317.xposed.runtime.state.RuntimeStateStore
 import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
-import io.github.magisk317.uikit.entitlement.MobileGate
 import io.github.magisk317.smscode.common.utils.XscPreferenceHooks
 import io.github.magisk317.smscode.common.utils.HookPreferenceMirror
 import io.github.magisk317.xposed.capability.utils.ModuleActivationStore
@@ -33,12 +31,6 @@ import io.github.magisk317.xposed.logging.DefaultLogSanitizer
 import io.github.magisk317.smscode.di.appModule
 import io.github.magisk317.smscode.di.billingModule
 import io.github.magisk317.smscode.di.uiModule
-import com.magisk317.mobile.entitlement.MobileEntitlementBridge
-import io.github.magisk317.smscode.security.CiUpdateGateVault
-import com.magisk317.mobile.entitlement.MobileEntitlementConfig
-import com.magisk317.mobile.entitlement.MobileEntitlementCoordinator
-import com.magisk317.mobile.entitlement.MobileEntitlementPublishedState
-import com.magisk317.mobile.entitlement.MobileEntitlementRuntime
 import io.github.magisk317.smscode.runtime.RuntimeCodeRecordRestoreFacade
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -50,17 +42,11 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import timber.log.Timber
-import io.github.magisk317.xposed.logging.MagiskOtel
-import io.github.magisk317.xposed.logging.AnonymousInstallationId
-import io.github.magisk317.xposed.logging.getOrCreate
-import io.github.magisk317.xposed.logging.configureForInstallation
 
 @SuppressLint("LogNotTimber")
 class SmsCodeApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var startedActivityCount: Int = 0
-    private var entitlementForegroundPrimed = false
 
     override fun onCreate() {
         super.onCreate()
@@ -73,77 +59,9 @@ class SmsCodeApplication : Application() {
         )
         RuntimeCrashLogs.install(this)
         AppPreferencesDataStore.install(XscPreferenceHooks)
-        if (BuildConfig.ENABLE_MOBILE_ENTITLEMENT) {
-            configureMobileEntitlement()
-        } else {
-            // Play distribution ships without the activation gate; publish an
-            // always-allowed snapshot so the automation gates (app and hook
-            // mirror) see the open state, including installs that cached an
-            // unactivated decision.
-            // KMP main (6360b89): MobileGate lives in commonMain now, so the
-            // Context parameter and the Context-taking lambdas it used to
-            // thread through are gone - the closures capture the application
-            // context directly.
-            MobileGate.publishAlwaysAllowed(
-                persist = {
-                    AppPreferencesDataStore.batchEdit(applicationContext) {
-                        setBoolean(PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED, true)
-                    }
-                },
-                mirror = { HookPreferenceMirror.publish(applicationContext) },
-            )
-        }
         if (logPolicy.loggingEnabled) {
             android.util.Log.w("smscode", "SmsCodeApplication.onCreate() START")
         }
-        val installationId = AnonymousInstallationId.getOrCreate(this, TELEMETRY_PREFS_NAME)
-        runBlocking {
-            AppPreferencesDataStore.setString(
-                this@SmsCodeApplication,
-                AnonymousInstallationId.PREFERENCE_KEY,
-                installationId,
-            )
-        }
-        MagiskOtel.configureForInstallation(
-            this,
-            MagiskOtel.Config(
-                enabled = BuildConfig.DEBUG || BuildConfig.IS_CI_BUILD || runBlocking {
-                    AppPreferencesDataStore.getBoolean(
-                        this@SmsCodeApplication,
-                        PrefConst.KEY_ENABLE_ANALYTICS,
-                        true,
-                    )
-                },
-                serviceName = "xposedsmscode",
-                serviceVersion = BuildConfig.VERSION_NAME,
-                serviceCommit = BuildConfig.COMMIT_HASH,
-                deviceAttributes =
-                    mapOf(
-                        "device.manufacturer" to Build.MANUFACTURER,
-                        "device.model" to Build.MODEL,
-                        "os.name" to "android",
-                        "os.version" to Build.VERSION.RELEASE,
-                        "os.api_level" to Build.VERSION.SDK_INT.toString(),
-                        // Lets the cloud side split play from sideload installs,
-                        // which share version and commit.
-                        "distribution.channel" to BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
-                    ),
-                projectId = "83955172",
-                projectName = "XposedSmsCode",
-                environment = if (BuildConfig.DEBUG) "debug" else if (BuildConfig.IS_CI_BUILD) "ci" else "release",
-                // Skip dominates this service (~81% of every span): an intercept check that found
-                // nothing to do. Dropping it keeps ok / error / fallback readable.
-                suppressedResultValues = setOf("skip"),
-            ),
-            TELEMETRY_PREFS_NAME,
-        )
-        MagiskOtel.event(
-            name = "app.boot",
-            attributes = mapOf(
-                "result" to "ok",
-                "process" to "main",
-            ),
-        )
         ensureIpcToken()
         RuntimeDiagnosticsBridge.ensureInstalled()
         if (logPolicy.loggingEnabled) {
@@ -168,49 +86,6 @@ class SmsCodeApplication : Application() {
         importPendingCodeRecords()
         syncPreferences()
         registerLicenseActivityKiller()
-        if (BuildConfig.ENABLE_MOBILE_ENTITLEMENT) {
-            // entitlement 100% 保留：任何分发形态都初始化激活协调器
-            MobileEntitlementCoordinator.initialize(this, applicationScope)
-        }
-        // 备份只在「版本真的动了、且这个构建自己没有激活」时才花掉，所以 Release 也读：
-        // 这里没有任何收回激活的动作，漏恢复只会让用户白跑一次服务器。
-        CiUpdateGateVault.restoreIfEligible(this)
-    }
-
-
-    private fun configureMobileEntitlement() {
-        MobileEntitlementRuntime.configure(
-            MobileEntitlementConfig(
-                apiOrigin = BuildConfig.MOBILE_ENTITLEMENT_API_ORIGIN,
-                signingPublicJwk = BuildConfig.MOBILE_ENTITLEMENT_SIGNING_PUBLIC_JWK,
-                appId = "xposed-sms-code",
-                channel = BuildConfig.MOBILE_ENTITLEMENT_CHANNEL,
-                enforced = BuildConfig.MOBILE_ENTITLEMENT_ENFORCED,
-            ),
-            bridge = object : MobileEntitlementBridge {
-                override fun publish(context: Context, state: MobileEntitlementPublishedState): Boolean = runBlocking {
-                    AppPreferencesDataStore.batchEdit(context) {
-                        setBoolean(
-                            PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-                            state.automationAllowed,
-                        )
-                        setString(
-                            PrefConst.KEY_MOBILE_ENTITLEMENT_TOKEN,
-                            state.entitlementToken.orEmpty(),
-                        )
-                    }
-                    HookPreferenceMirror.publish(context)
-                }
-
-                override fun log(message: String, vararg args: Any?) {
-                    XLog.i(message, *args)
-                }
-            },
-        )
-    }
-
-    private companion object {
-        const val TELEMETRY_PREFS_NAME = "smscode_telemetry_prefs"
     }
 
     private fun importPendingCodeRecords() {
@@ -300,18 +175,6 @@ class SmsCodeApplication : Application() {
             frameworkName ?: "unknown",
             frameworkVersion ?: "unknown",
         )
-        MagiskOtel.event(
-            name = "app.lifecycle",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "xposed_service_bind",
-                "reason" to "connected",
-                "source" to (frameworkName ?: "unknown"),
-            ),
-            statusOk = true,
-        )
     }
 
     internal fun handleXposedServiceDied() {
@@ -322,32 +185,10 @@ class SmsCodeApplication : Application() {
             verboseLogging = readVerboseLogMode(),
         )
         XLog.w(message = "Xposed service disconnected")
-        MagiskOtel.event(
-            name = "app.lifecycle",
-            attributes = mapOf(
-                "result" to "error",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "xposed_service_died",
-                "reason" to "disconnected",
-            ),
-            statusOk = false,
-        )
     }
 
     internal fun logXposedServiceBridgeFailure(throwable: Throwable) {
         XLog.w(message = "Failed to register Xposed service listener: %s", throwable.message ?: "unknown")
-        MagiskOtel.event(
-            name = "app.lifecycle",
-            attributes = mapOf(
-                "result" to "error",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "xposed_service_bridge",
-                "reason" to throwable.javaClass.simpleName,
-            ),
-            statusOk = false,
-        )
     }
 
     private fun readVerboseLogMode(): Boolean = MagiskLogPolicy.current().verboseLogging
@@ -355,23 +196,7 @@ class SmsCodeApplication : Application() {
     private fun registerLicenseActivityKiller() {
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-            override fun onActivityStarted(activity: Activity) {
-                if (startedActivityCount == 0) {
-                    if (entitlementForegroundPrimed) {
-                        if (BuildConfig.ENABLE_MOBILE_ENTITLEMENT) {
-                            applicationScope.launch {
-                                runCatching { MobileEntitlementCoordinator.refresh(this@SmsCodeApplication) }.onFailure {
-                                    XLog.w("entitlement refresh failed: ${it.message}", it)
-                                }
-                            }
-                        }
-                    } else {
-                        // initialize() covers the first process start.
-                        entitlementForegroundPrimed = true
-                    }
-                }
-                startedActivityCount += 1
-            }
+            override fun onActivityStarted(activity: Activity) {}
             override fun onActivityResumed(activity: Activity) {
                 if (activity.javaClass.name == "com.pairip.licensecheck.LicenseActivity") {
                     runCatching {
@@ -382,9 +207,7 @@ class SmsCodeApplication : Application() {
                 }
             }
             override fun onActivityPaused(activity: Activity) {}
-            override fun onActivityStopped(activity: Activity) {
-                startedActivityCount = (startedActivityCount - 1).coerceAtLeast(0)
-            }
+            override fun onActivityStopped(activity: Activity) {}
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {}
         })

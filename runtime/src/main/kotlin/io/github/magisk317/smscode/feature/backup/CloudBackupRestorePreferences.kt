@@ -18,8 +18,8 @@ data class CloudBackupRestoreHooks(
 
 /**
  * Applies a restored preference map with the same typed guards the SAF restore
- * uses: entitlement state is runtime-derived and skipped, values are coerced to
- * their declared types before writing, and the commit result is verified.
+ * uses: values are coerced to their declared types before writing, and the
+ * commit result is verified.
  */
 object CloudBackupRestorePreferences {
 
@@ -48,12 +48,6 @@ object CloudBackupRestorePreferences {
         var launcherVisible: Boolean? = null
         val result = AppPreferenceTransactions.commit(context) {
             for ((key, rawValue) in preferences) {
-                if (key == PrefConst.KEY_MOBILE_ENTITLEMENT_TOKEN ||
-                    key == PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED
-                ) {
-                    XLog.w(message = "Cloud restore preference skipped: entitlement state is runtime-derived")
-                    continue
-                }
                 if (rawValue == null) continue
                 val coerced = coerceRestoreValue(key, rawValue)
                 if (!coerced.shouldWrite) {

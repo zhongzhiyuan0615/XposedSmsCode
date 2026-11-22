@@ -10,7 +10,7 @@ import java.io.File
 import kotlinx.coroutines.runBlocking
 
 /**
- * Thin host facade; export/import, telemetry, and file handling live in the
+ * Thin host facade; export/import and file handling live in the
  * shared [CodeRecordFileStore] (smscode-core runtime) so both hosts stay
  * behaviorally aligned. Only the storage insert/trim closure stays host-side.
  */

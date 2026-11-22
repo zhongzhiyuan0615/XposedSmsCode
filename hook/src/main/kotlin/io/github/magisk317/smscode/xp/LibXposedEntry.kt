@@ -19,8 +19,6 @@ import io.github.magisk317.xposed.LibXposedHookApi
 import io.github.magisk317.xposed.logging.XLog
 import io.github.magisk317.xposed.BaseHook
 import io.github.magisk317.xposed.BaseLibXposedEntry
-import io.github.magisk317.xposed.logging.MagiskOtel
-import io.github.magisk317.xposed.logging.StageEventEmitter
 
 class LibXposedEntry : BaseLibXposedEntry {
 
@@ -66,13 +64,6 @@ class LibXposedEntry : BaseLibXposedEntry {
         } catch (t: Throwable) {
             XLog.e(message = "", t)
         }
-        StageEventEmitter.emit(
-            name = "hook.load",
-            result = "ok",
-            stage = "module_runtime",
-            reason = "installed",
-            source = "xposedsmscode",
-        )
     }
 
     private fun installCoreRuntime() {

@@ -16,27 +16,7 @@ import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesHooks
  */
 object XscPreferenceHooks : AppPreferencesHooks {
     override suspend fun publishRemoteEntries(context: Context, editor: SharedPreferences.Editor) {
-        editor.putString(
-            io.github.magisk317.xposed.logging.AnonymousInstallationId.PREFERENCE_KEY,
-            AppPreferencesDataStore.getString(
-                context,
-                io.github.magisk317.xposed.logging.AnonymousInstallationId.PREFERENCE_KEY,
-                "",
-            ),
-        )
         editor.putBoolean(PrefConst.KEY_ENABLE, AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_ENABLE, true))
-        editor.putBoolean(
-            PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-            AppPreferencesDataStore.getBoolean(
-                context,
-                PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-                PrefConst.DEFAULT_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-            ),
-        )
-        editor.putString(
-            PrefConst.KEY_MOBILE_ENTITLEMENT_TOKEN,
-            AppPreferencesDataStore.getString(context, PrefConst.KEY_MOBILE_ENTITLEMENT_TOKEN, ""),
-        )
         editor.putBoolean(
             PrefConst.KEY_SETTINGS_ACCORDION_MODE,
             AppPreferencesDataStore.getBoolean(context, PrefConst.KEY_SETTINGS_ACCORDION_MODE, true),

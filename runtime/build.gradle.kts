@@ -1,24 +1,13 @@
 plugins {
     id("magisk.android.library")
     // The hook process reads preferences from this module, so it must carry the
-    // distribution flavors (magisk.android.distribution) and the gate flag
-    // (magisk.mobile.gate) the app decides with. Without them the hook boundary
-    // would enforce the signed lease on every distribution, play included.
+    // distribution flavors (magisk.android.distribution) the app decides with.
     id("magisk.android.distribution")
-    id("magisk.mobile.gate")
     id(libs.plugins.kotlin.serialization.get().pluginId)
     id(libs.plugins.kotlin.parcelize.get().pluginId)
     id("magisk.android.room")
 }
 val relayDownloadUrl = "https://github.com/magisk3171/xinyi-relay"
-val mobileEntitlementApiOrigin = providers.gradleProperty("mobileEntitlementApiOrigin")
-    .orElse("https://activate.magisk317.qzz.io")
-    .get()
-val mobileEntitlementSigningPublicJwk = providers.gradleProperty("mobileEntitlementSigningPublicJwk")
-    .orElse("""{"kty":"EC","x":"4kPpwUt1wFRuF3EqGq6q57J3YmANf7wyiNH90FNkAbI","y":"U4-E1XK6LjWIXMFNEoSAoik7nD1S07BDb7qAipQd4Ts","crv":"P-256","alg":"ES256","use":"sig","kid":"mobile-entitlement-1"}""")
-    .get()
-fun buildConfigString(value: String): String =
-    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "io.github.magisk317.smscode.runtime"
@@ -38,8 +27,6 @@ android {
         buildConfigField("String", "LOG_TAG", "\"smscode\"")
         buildConfigField("String", "APPLICATION_ID", "\"com.github.tianma8023.xposed.smscode\"")
         buildConfigField("String", "B_DOWNLOAD_URL", "\"$relayDownloadUrl\"")
-        buildConfigField("String", "MOBILE_ENTITLEMENT_API_ORIGIN", buildConfigString(mobileEntitlementApiOrigin))
-        buildConfigField("String", "MOBILE_ENTITLEMENT_SIGNING_PUBLIC_JWK", buildConfigString(mobileEntitlementSigningPublicJwk))
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -73,11 +60,9 @@ val magiskIsCiBuild: Boolean = (providers.gradleProperty("isCiBuild").orNull
 dependencies {
     implementation(project(":magisk-xposed-kit:runtime"))
     implementation(project(":magisk-xposed-kit:contract"))
-    implementation(libs.mobile.entitlement.android)
     implementation(project(":magisk-xposed-kit"))
     implementation(project(":magisk-xposed-kit:capability"))
     implementation(project(":magisk-xposed-kit:runtime"))
-    implementation(project(":magisk-xposed-kit:entitlement"))
     implementation(project(":magisk-xposed-kit:logging"))
     // The cloud backup payload source and provider resolver are runtime API
     // types the app shell composes in DI, so the kit backup modules must stay

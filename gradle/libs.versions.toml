@@ -44,8 +44,6 @@ benchmark = "1.5.0"
 okhttp = "5.5.1"
 retrofit = "3.0.0"
 paho-mqtt = "1.2.5"
-firebase-bom = "35.2.0"
-google-services = "4.6.0"
 coil3 = "3.6.3"
 koin = "4.2.2"
 miuix = "0.9.4"
@@ -65,10 +63,8 @@ hiddenapibypass = "6.2"
 hyperisland-kit = "0.4.5"
 libsu = "6.0.0"
 markdown = "0.7.18"
-metrics-performance = "1.0.0"
 miuix-blur = "0.9.4"
 material-kolor = "5.0.1"
-mobile-entitlement = "0.4.0"
 versionCode = "138"
 versionName = "3.4.4"
 
@@ -107,7 +103,6 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 androidx-material = { module = "androidx.compose.material:material" }
 androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
-androidx-metrics-performance = { module = "androidx.metrics:metrics-performance", version.ref = "metrics-performance" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
@@ -125,9 +120,6 @@ coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3
 coil3-core = { module = "io.coil-kt.coil3:coil", version.ref = "coil3" }
 conscrypt-openjdk-uber = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "conscrypt" }
 detekt-rules-ktlint = { module = "dev.detekt:detekt-rules-ktlint-wrapper", version.ref = "detekt" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
-firebase-auth = { module = "com.google.firebase:firebase-auth" }
-firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
 hyperisland-kit = { module = "io.github.d4viddf:hyperisland_kit", version.ref = "hyperisland-kit" }
 jakarta-mail = { module = "com.sun.mail:jakarta.mail", version.ref = "jakarta-mail" }
@@ -154,7 +146,6 @@ miuixBlur = { module = "top.yukonga.miuix.kmp:miuix-blur", version.ref = "miuix-
 miuixPreference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.ref = "miuix" }
 materialKolor = { module = "com.materialkolor:material-kolor", version.ref = "material-kolor" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
-mobile-entitlement-android = { module = "com.magisk317.mobile:entitlement-android", version.ref = "mobile-entitlement" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
@@ -176,7 +167,6 @@ android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "a
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-test = { id = "com.android.test", version.ref = "agp" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
-google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

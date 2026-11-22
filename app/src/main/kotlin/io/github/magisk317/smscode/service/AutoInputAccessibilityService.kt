@@ -13,11 +13,8 @@ import io.github.magisk317.smscode.runtime.verification.AutoInputExecutionOrches
 import io.github.magisk317.xposed.runtime.contract.autoinput.AutoInputFallbackPolicy
 import io.github.magisk317.smscode.runtime.verification.AutoInputAccessibilityNodeHelper.Result as AutoInputResult
 import io.github.magisk317.smscode.runtime.verification.AutoInputAccessibilityRequestHandler
-import io.github.magisk317.smscode.common.constant.PrefConst
-import io.github.magisk317.smscode.runtime.common.prefs.AppPreferencesDataStore
 import io.github.magisk317.xposed.capability.system.SystemInputInjectorHook
 import io.github.magisk317.xposed.logging.XLog
-import io.github.magisk317.xposed.logging.MagiskOtel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
@@ -27,15 +24,10 @@ class AutoInputAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         XLog.d(message = "Accessibility lifecycle create: %s", accessibilityStateSnapshot())
-        emitA11y(stage = "create")
     }
 
     private val autoInputReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (!isMobileAutomationAllowed()) {
-                XLog.i(message = "Mobile entitlement gate skipped accessibility auto-input")
-                return
-            }
             AutoInputAccessibilityRequestHandler.handle(
                 serviceContext = this@AutoInputAccessibilityService,
                 receiver = this,
@@ -57,7 +49,6 @@ class AutoInputAccessibilityService : AccessibilityService() {
             accessibilityServiceInfoSummary(),
         )
         XLog.d(message = "Accessibility auto input service connected")
-        emitA11y(stage = "connected")
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -89,7 +80,6 @@ class AutoInputAccessibilityService : AccessibilityService() {
         )
         unregisterAutoInputReceiver()
         XLog.d(message = "Accessibility auto input service destroyed")
-        emitA11y(stage = "destroy")
         super.onDestroy()
     }
 
@@ -189,10 +179,6 @@ class AutoInputAccessibilityService : AccessibilityService() {
         code: String,
         autoEnter: Boolean,
     ): AutoInputResult {
-        if (!isMobileAutomationAllowed()) {
-            XLog.i(message = "Mobile entitlement gate skipped accessibility execution")
-            return AutoInputResult(false, "none", "mobile_entitlement", packageName)
-        }
         // Shared window-settle retries: same policy xinyi applies, so a slowly settling
         // target window does not fail the whole auto-input on the first attempt.
         return autoInputOrchestrator.execute(
@@ -207,34 +193,6 @@ class AutoInputAccessibilityService : AccessibilityService() {
                     modulePackage = packageName,
                 )
             },
-        )
-    }
-
-    private fun isMobileAutomationAllowed(): Boolean =
-        // KMP main (6360b89) moved MobileGate into commonMain: the Context
-        // parameter is gone from the API (android.content.Context has no
-        // common-source representation), so capture it in the closure.
-        io.github.magisk317.uikit.entitlement.MobileGate.isAutomationAllowed(
-            com.github.tianma8023.xposed.smscode.BuildConfig.ENABLE_MOBILE_ENTITLEMENT,
-        ) {
-            AppPreferencesDataStore.getBoolean(
-                applicationContext,
-                PrefConst.KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-                PrefConst.DEFAULT_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED,
-            )
-        }
-
-
-    private fun emitA11y(stage: String, result: String = "ok", statusOk: Boolean = true) {
-        MagiskOtel.event(
-            name = "a11y.service",
-            attributes = mapOf(
-                "result" to result,
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to stage,
-            ),
-            statusOk = statusOk,
         )
     }
 

@@ -20,17 +20,6 @@ dependencyResolutionManagement {
                 includeGroupByRegex("com\\.github\\..*")
             }
         }
-        maven {
-            name = "MagiskMobilePrivate"
-            url = uri(
-                providers.gradleProperty("mobile.private.maven.url").orNull
-                    ?: System.getenv("MOBILE_PRIVATE_MAVEN_URL")
-                    ?: "https://gitlab.com/api/v4/projects/85187820/packages/maven",
-            )
-            content {
-                includeGroup("com.magisk317.mobile")
-            }
-        }
     }
 }
 
@@ -58,7 +47,6 @@ include(
     ":magisk-xposed-kit:capability",
     ":magisk-xposed-kit:runtime",
     ":magisk-xposed-kit:permission",
-    ":magisk-xposed-kit:entitlement",
     ":magisk-xposed-kit:service",
     ":magisk-xposed-kit:backup",
     ":magisk-xposed-kit:backup-webdav",
@@ -79,7 +67,6 @@ project(":magisk-xposed-kit:diagnostics").projectDir = file("magisk-xposed-kit/d
 project(":magisk-xposed-kit:capability").projectDir = file("magisk-xposed-kit/capability")
 project(":magisk-xposed-kit:runtime").projectDir = file("magisk-xposed-kit/runtime")
 project(":magisk-xposed-kit:permission").projectDir = file("magisk-xposed-kit/permission")
-project(":magisk-xposed-kit:entitlement").projectDir = file("magisk-xposed-kit/entitlement")
 project(":magisk-xposed-kit:service").projectDir = file("magisk-xposed-kit/service")
 project(":magisk-xposed-kit:backup").projectDir = file("magisk-xposed-kit/backup")
 project(":magisk-xposed-kit:backup-webdav").projectDir = file("magisk-xposed-kit/backup-webdav")

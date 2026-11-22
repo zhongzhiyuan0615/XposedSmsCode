@@ -6,7 +6,6 @@ import io.github.magisk317.smscode.data.db.DBManager
 import io.github.magisk317.smscode.data.db.entity.SmsMsg
 import io.github.magisk317.xposed.runtime.contract.notification.NotificationPlatformBridge
 import io.github.magisk317.smscode.verification.SmsDuplicateCheckResult
-import io.github.magisk317.xposed.logging.MagiskOtel
 
 /**
  * Bridge interfaces for hook-layer access to runtime services.
@@ -23,7 +22,6 @@ import io.github.magisk317.xposed.logging.MagiskOtel
  */
 interface HookPrefsAccess {
     fun isEnabled(context: Context): Boolean
-    fun mobileAutomationAllowed(context: Context): Boolean
     fun isVerboseLogMode(context: Context): Boolean
     fun autoInputCodeEnabled(context: Context): Boolean
     fun getAutoInputCodeDelay(context: Context): Long
@@ -148,15 +146,5 @@ object HookRuntimeBridge {
         this.storage = storage
         this.codeRecord = codeRecord
         this.contentProvider = contentProvider
-        MagiskOtel.event(
-            name = "hook.bridge",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "hook",
-                "stage" to "install",
-            ),
-            statusOk = true,
-        )
     }
 }

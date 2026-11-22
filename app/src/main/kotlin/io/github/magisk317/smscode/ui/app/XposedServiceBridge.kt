@@ -2,7 +2,6 @@ package io.github.magisk317.smscode.ui.app
 
 import io.github.magisk317.smscode.common.constant.PrefConst
 import io.github.magisk317.smscode.common.utils.HookPreferenceMirror
-import io.github.magisk317.xposed.logging.MagiskOtel
 import io.github.magisk317.xposed.logging.XLog
 import io.github.magisk317.xposed.service.FrameworkHookTargets
 import io.github.magisk317.xposed.service.ServiceState
@@ -42,16 +41,6 @@ internal object XposedServiceBridge {
         applicationScope: CoroutineScope,
         bound: ServiceState.Bound,
     ) {
-        MagiskOtel.event(
-            name = "hook.service",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "bound",
-            ),
-            statusOk = true,
-        )
         XLog.i(
             message = "XposedServiceBridge.onServiceBind() called: framework=%s version=%s",
             bound.service.frameworkName,
@@ -73,16 +62,6 @@ internal object XposedServiceBridge {
     }
 
     private fun onRetracted(application: SmsCodeApplication) {
-        MagiskOtel.event(
-            name = "hook.service",
-            attributes = mapOf(
-                "result" to "ok",
-                "duration_ms" to "0",
-                "process" to "app",
-                "stage" to "died",
-            ),
-            statusOk = true,
-        )
         XLog.w(message = "XposedServiceBridge.onServiceDied() called")
         application.handleXposedServiceDied()
     }

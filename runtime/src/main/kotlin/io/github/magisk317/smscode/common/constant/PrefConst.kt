@@ -79,7 +79,6 @@ object PrefConst {
     const val KEY_RUNTIME_LOG_RETENTION_DAYS = "pref_runtime_log_retention_days"
     val RUNTIME_LOG_RETENTION_DAYS_DEFAULT = MagiskLogPolicy.DEFAULT_LOG_RETENTION_DAYS
     val RUNTIME_LOG_RETENTION_DAYS_MIN = MagiskLogPolicy.MIN_LOG_RETENTION_DAYS
-    const val KEY_ENABLE_ANALYTICS = "pref_enable_analytics"
     const val KEY_AUTO_UPDATE_ON_START = "pref_auto_update_on_start"
     const val KEY_AUTO_UPDATE_WIFI_ONLY = "pref_auto_update_wifi_only"
     const val KEY_TRACK_CI_BUILDS = "pref_track_ci_builds"
@@ -94,9 +93,6 @@ object PrefConst {
     const val KEY_BACKUP_COMPAT_TIP_SHOWN = "pref_backup_compat_tip_shown"
     const val KEY_ABOUT_COMPOSE = "pref_about_compose"
     const val KEY_IPC_TOKEN = "ipc_token"
-    const val KEY_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED = "mobile_entitlement_automation_allowed"
-    const val KEY_MOBILE_ENTITLEMENT_TOKEN = "entitlement_token"
-    const val DEFAULT_MOBILE_ENTITLEMENT_AUTOMATION_ALLOWED = false
     const val KEY_SIM_SLOT1_REMARK = "pref_sim_slot1_remark"
     const val KEY_SIM_SLOT2_REMARK = "pref_sim_slot2_remark"
 }
